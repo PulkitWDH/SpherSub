@@ -1,0 +1,6 @@
+{
+  "name": "SPHEREx Sky Subtraction & 10-AI Coordinate Finder",
+  "description": "102-Band Image Subtraction & Parallel 10-Zone Pixel Detection for NASA Space Apps Challenge (Planet X and SPHEREx).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

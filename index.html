@@ -1,0 +1,4148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SPHEREx Astrometric Difference Pipeline</title>
+    <meta
+      name="description"
+      content="Star-Matched Epoch Registration, 5-Sigma MAD Difference Imaging, Parallel 5x2 Overlap Tile Extraction, and J2000 Astrometric Catalog."
+    />
+    <meta property="og:title" content="SPHEREx Astrometric Difference Pipeline" />
+    <meta
+      property="og:description"
+      content="Star-Matched Epoch Registration, 5-Sigma MAD Difference Imaging, Parallel 5x2 Overlap Tile Extraction, and J2000 Astrometric Catalog."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <style>
+      :root {
+        --bg-void: #07080a;
+        --bg-ribbon: #0b0d11;
+        --bg-rail: #0d1015;
+        --bg-surface: #13171f;
+        --bg-surface-hover: #1b212d;
+        --bg-input: #0a0c10;
+        --border-hairline: #212733;
+        --border-strong: #323c4e;
+        --text-primary: #f2f4f7;
+        --text-secondary: #a1abbc;
+        --text-muted: #6c7689;
+        --accent-cyan: #2dd4bf;
+        --accent-cyan-btn: #0d9488;
+        --accent-cyan-dim: rgba(45, 212, 191, 0.12);
+        --accent-amber: #fb923c;
+        --accent-amber-btn: #ea580c;
+        --accent-amber-dim: rgba(251, 146, 60, 0.14);
+        --accent-emerald: #34d399;
+        --font-sans: 'IBM Plex Sans', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-void);
+        color: var(--text-primary);
+        font-family: var(--font-sans);
+        line-height: 1.45;
+        -webkit-font-smoothing: antialiased;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      button,
+      select,
+      input {
+        font-family: inherit;
+      }
+
+      .tabular-nums {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Root Observatory Console Shell */
+      .console-shell {
+        width: 100%;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* Asymmetric Split Console Body */
+      .workstation-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr);
+        min-width: 0;
+      }
+
+      /* Left Parameter & Calibration Sidebar */
+      .control-rail {
+        background: var(--bg-rail);
+        border-right: 1px solid var(--border-hairline);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+
+      .rail-section {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border-hairline);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .rail-section:last-child {
+        border-bottom: none;
+      }
+
+      .section-kicker {
+        margin: 0;
+        font-size: 0.69rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+
+      .field-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 0;
+      }
+
+      .field-label {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+      }
+
+      select,
+      input[type='text'],
+      input[type='number'] {
+        width: 100%;
+        max-width: 100%;
+        height: 36px;
+        padding: 0 10px;
+        background: var(--bg-input);
+        color: var(--text-primary);
+        border: 1px solid var(--border-strong);
+        border-radius: 2px;
+        font-size: 0.81rem;
+        outline: none;
+        transition: border-color 140ms ease;
+      }
+
+      select {
+        cursor: pointer;
+      }
+
+      select:focus-visible,
+      button:focus-visible,
+      input:focus-visible,
+      .file-slot:focus-within {
+        outline: 2px solid var(--accent-cyan);
+        outline-offset: 1px;
+      }
+
+      button,
+      .file-slot {
+        height: 36px;
+        padding: 0 12px;
+        border-radius: 2px;
+        border: 1px solid var(--border-strong);
+        background: var(--bg-surface);
+        color: var(--text-primary);
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        white-space: nowrap;
+        transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease;
+      }
+
+      button:hover:not(:disabled),
+      .file-slot:hover {
+        background: var(--bg-surface-hover);
+        border-color: var(--accent-cyan);
+      }
+
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .btn-block {
+        width: 100%;
+      }
+
+      .btn-row-2 {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .btn-primary-cyan {
+        background: var(--accent-cyan-btn);
+        border-color: var(--accent-cyan);
+        color: #f8fafc;
+        font-weight: 700;
+        height: 38px;
+      }
+
+      .btn-primary-cyan:hover:not(:disabled) {
+        background: #14b8a6;
+        border-color: #5eead4;
+        color: #031513;
+      }
+
+      .btn-primary-amber {
+        background: var(--accent-amber-btn);
+        border-color: var(--accent-amber);
+        color: #fff7ed;
+        font-weight: 700;
+        height: 38px;
+      }
+
+      .btn-primary-amber:hover:not(:disabled) {
+        background: var(--accent-amber);
+        border-color: #fdba74;
+        color: #160901;
+      }
+
+      .btn-active-amber {
+        background: var(--accent-amber-dim);
+        border-color: var(--accent-amber);
+        color: #fed7aa;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border-color: var(--border-hairline);
+        color: var(--text-secondary);
+        height: 32px;
+        font-size: 0.76rem;
+      }
+
+      .btn-ghost:hover:not(:disabled) {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+
+      .file-slot {
+        position: relative;
+        overflow: hidden;
+        font-size: 0.77rem;
+        padding: 0 10px;
+      }
+
+      .file-slot input[type='file'] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .slider-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .threshold-readout {
+        padding: 2px 7px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+        font-size: 0.78rem;
+        color: var(--accent-cyan);
+        font-weight: 700;
+      }
+
+      input[type='range'] {
+        width: 100%;
+        accent-color: var(--accent-cyan);
+        cursor: pointer;
+        margin: 2px 0;
+      }
+
+      .toggle-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        color: var(--text-primary);
+        cursor: pointer;
+        user-select: none;
+        min-height: 28px;
+      }
+
+      .toggle-check input[type='checkbox'] {
+        width: 15px;
+        height: 15px;
+        accent-color: var(--accent-amber);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .drawer-toggle-btn {
+        justify-content: space-between;
+        width: 100%;
+        height: 33px;
+        font-size: 0.77rem;
+        color: var(--text-secondary);
+        background: var(--bg-input);
+      }
+
+      .wcs-calibration-drawer {
+        display: none;
+        flex-direction: column;
+        gap: 9px;
+        padding-top: 4px;
+      }
+
+      .wcs-calibration-drawer.is-open {
+        display: flex;
+      }
+
+      .rail-telemetry-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.75rem;
+      }
+
+      .rail-kv {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 7px 9px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+      }
+
+      .rail-k {
+        font-size: 0.68rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+      }
+
+      .rail-v {
+        font-size: 0.76rem;
+        color: var(--text-primary);
+        word-break: break-word;
+      }
+
+      /* Right Main Optical Bench & Workbench */
+      .optical-bench {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        background: var(--bg-void);
+      }
+
+      .bench-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 16px;
+        padding: 9px 18px;
+        background: var(--bg-ribbon);
+        border-bottom: 1px solid var(--border-hairline);
+      }
+
+      .bench-status-line {
+        font-size: 0.79rem;
+        color: var(--text-secondary);
+        min-width: 0;
+      }
+
+      .viewport-mode-bar {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--bg-input);
+        border: 1px solid var(--border-hairline);
+        padding: 2px;
+        border-radius: 2px;
+      }
+
+      .mode-tab {
+        height: 28px;
+        padding: 0 10px;
+        border: none;
+        background: transparent;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        font-weight: 600;
+        border-radius: 2px;
+      }
+
+      .mode-tab:hover:not(:disabled) {
+        background: var(--bg-surface);
+        color: var(--text-primary);
+      }
+
+      .mode-tab.is-active {
+        background: var(--bg-surface-hover);
+        color: var(--accent-cyan);
+        border: 1px solid var(--border-strong);
+      }
+
+      /* Optical Image Stage: Large Primary Difference Frame + Stacked Epoch Reference Frames */
+      .optical-stage {
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--border-hairline);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .canvas-grid {
+        display: grid;
+        grid-template-columns: 278px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      #epoch1Card {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      #epoch2Card {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      #subtractCard {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        border-color: var(--border-strong);
+      }
+
+      #subtractCard .canvas-frame {
+        flex: 1 1 auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .canvas-grid.is-focus-diff {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto;
+      }
+
+      .canvas-grid.is-focus-diff .epoch-source-pane {
+        display: none;
+      }
+
+      .canvas-grid.is-focus-diff #subtractCard {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .canvas-pane {
+        min-width: 0;
+        background: #060709;
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+        display: flex;
+        flex-direction: column;
+        transition: border-color 140ms ease;
+      }
+
+      .canvas-pane.drag-over {
+        border-color: var(--accent-cyan);
+      }
+
+      .pane-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 10px;
+        background: var(--bg-rail);
+        border-bottom: 1px solid var(--border-hairline);
+        min-width: 0;
+      }
+
+      .pane-title {
+        margin: 0;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: var(--text-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .pane-meta {
+        font-size: 0.71rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .canvas-frame {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 2 / 1;
+        background: #040507;
+        overflow: hidden;
+      }
+
+      .canvas-grid.is-focus-diff .canvas-frame {
+        max-height: 540px;
+        margin: 0 auto;
+      }
+
+      .canvas-frame canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        cursor: crosshair;
+      }
+
+      .pane-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 5px 10px;
+        background: var(--bg-ribbon);
+        border-top: 1px solid var(--border-hairline);
+        font-size: 0.71rem;
+        color: var(--text-muted);
+      }
+
+      .pane-foot span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Blink Comparator Optical Strip */
+      .blink-panel {
+        background: var(--bg-rail);
+        border: 1px solid var(--accent-amber);
+        border-radius: 2px;
+        padding: 10px 12px;
+        display: none;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .blink-panel.is-open {
+        display: flex;
+      }
+
+      .blink-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .blink-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .blink-title-wrap h2 {
+        margin: 0;
+        font-size: 0.88rem;
+        font-weight: 700;
+      }
+
+      .blink-epoch-indicator {
+        font-family: var(--font-mono);
+        font-size: 0.77rem;
+        font-weight: 700;
+        color: var(--accent-amber);
+      }
+
+      .blink-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .blink-controls select {
+        height: 32px;
+        width: auto;
+      }
+
+      .blink-controls button {
+        height: 32px;
+      }
+
+      .blink-viewport {
+        width: 100%;
+        max-width: 920px;
+        margin: 0 auto;
+        aspect-ratio: 2 / 1;
+        border: 1px solid var(--border-strong);
+        background: #03060c;
+      }
+
+      .blink-viewport canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      /* Lower Data & Astrometry Workbench */
+      .workbench-split {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 365px;
+        border-bottom: 1px solid var(--border-hairline);
+        min-width: 0;
+      }
+
+      .workbench-pane {
+        min-width: 0;
+        padding: 14px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+      }
+
+      .workbench-pane-inspector {
+        border-left: 1px solid var(--border-hairline);
+        background: var(--bg-rail);
+      }
+
+      .pane-heading-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px 12px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-hairline);
+      }
+
+      .pane-heading {
+        margin: 0;
+        font-size: 0.88rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: var(--text-primary);
+      }
+
+      .pane-sub {
+        font-size: 0.73rem;
+        color: var(--text-secondary);
+        white-space: nowrap;
+      }
+
+      /* Focused Source Coordinate Matrix */
+      .coord-matrix {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .coord-cell {
+        min-width: 0;
+        background: var(--bg-input);
+        padding: 8px 10px;
+        border-right: 1px solid var(--border-hairline);
+        border-bottom: 1px solid var(--border-hairline);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .coord-cell:nth-child(even) {
+        border-right: none;
+      }
+
+      .coord-cell:nth-last-child(-n + 2) {
+        border-bottom: none;
+      }
+
+      .coord-label {
+        font-size: 0.67rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--text-muted);
+        font-weight: 600;
+      }
+
+      .coord-value {
+        font-size: 0.96rem;
+        font-weight: 700;
+        color: var(--accent-cyan);
+        line-height: 1.25;
+        white-space: nowrap;
+      }
+
+      .coord-value-sm {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        line-height: 1.3;
+        white-space: normal;
+        word-break: break-word;
+      }
+
+      .psf-inspector-row {
+        display: grid;
+        grid-template-columns: 82px minmax(0, 1fr);
+        gap: 10px;
+        align-items: stretch;
+        background: var(--bg-input);
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+        padding: 9px;
+      }
+
+      .psf-crop-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .psf-crop-box canvas {
+        width: 72px;
+        height: 72px;
+        border: 1px solid var(--border-strong);
+        background: #040507;
+        image-rendering: pixelated;
+      }
+
+      .psf-profile-box {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 4px;
+      }
+
+      .psf-profile-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.7rem;
+        color: var(--text-secondary);
+      }
+
+      .psf-profile-box canvas {
+        width: 100%;
+        height: 60px;
+        display: block;
+        border: 1px solid var(--border-hairline);
+        background: #050608;
+      }
+
+      .overlap-banner {
+        padding: 8px 10px;
+        border-radius: 2px;
+        border: 1px solid var(--border-hairline);
+        background: var(--bg-input);
+        font-size: 0.77rem;
+        color: var(--text-secondary);
+        line-height: 1.4;
+      }
+
+      .overlap-banner.is-confirmed {
+        border-color: var(--accent-amber);
+        background: var(--accent-amber-dim);
+        color: #fed7aa;
+      }
+
+      .overlap-banner.is-single {
+        border-color: var(--accent-cyan);
+        background: var(--accent-cyan-dim);
+        color: #ccfbf1;
+      }
+
+      .export-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: auto;
+      }
+
+      /* Tables */
+      .table-wrap {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.72rem;
+      }
+
+      th {
+        text-align: left;
+        padding: 6px 5px;
+        color: var(--text-muted);
+        font-weight: 700;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid var(--border-strong);
+        white-space: nowrap;
+      }
+
+      td {
+        padding: 6px 5px;
+        border-bottom: 1px solid var(--border-hairline);
+        color: var(--text-primary);
+        vertical-align: middle;
+        white-space: nowrap;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      tbody tr.catalog-row {
+        cursor: pointer;
+        transition: background-color 110ms ease;
+      }
+
+      tbody tr.catalog-row:hover {
+        background: rgba(45, 212, 191, 0.08);
+      }
+
+      tbody tr.catalog-row.is-selected {
+        background: rgba(45, 212, 191, 0.14);
+      }
+
+      tr.row-detected {
+        background: rgba(251, 146, 60, 0.08);
+      }
+
+      .class-dipole {
+        color: var(--accent-amber);
+        font-weight: 600;
+      }
+
+      .class-new {
+        color: var(--accent-cyan);
+        font-weight: 600;
+      }
+
+      .empty-table-cell {
+        padding: 26px 12px;
+        text-align: center;
+        color: var(--text-muted);
+        white-space: normal;
+      }
+
+      /* Bottom 10-Tile Parallel Detector Array */
+      .detector-array-band {
+        padding: 14px 18px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 11px;
+        min-width: 0;
+      }
+
+      .tile-matrix-strip {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .tile-mini {
+        background: var(--bg-rail);
+        border: 1px solid var(--border-hairline);
+        border-radius: 2px;
+        padding: 6px 9px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 0.73rem;
+        transition: border-color 140ms ease, background-color 140ms ease;
+      }
+
+      .tile-mini.is-scanning {
+        border-color: var(--accent-cyan);
+        background: var(--accent-cyan-dim);
+      }
+
+      .tile-mini.is-clear {
+        border-color: rgba(52, 211, 153, 0.35);
+      }
+
+      .tile-mini.is-detected {
+        border-color: var(--accent-amber);
+        background: var(--accent-amber-dim);
+        color: #fed7aa;
+      }
+
+      .tile-state {
+        font-size: 0.69rem;
+        color: var(--text-muted);
+      }
+
+      .tile-mini.is-scanning .tile-state {
+        color: var(--accent-cyan);
+      }
+
+      .tile-mini.is-clear .tile-state {
+        color: var(--accent-emerald);
+      }
+
+      .tile-mini.is-detected .tile-state {
+        color: var(--accent-amber);
+        font-weight: 700;
+      }
+
+      .progress-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .progress-track {
+        width: 72px;
+        height: 5px;
+        background: var(--bg-void);
+        border-radius: 1px;
+        overflow: hidden;
+        border: 1px solid var(--border-hairline);
+        flex-shrink: 0;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0%;
+        background: var(--accent-cyan);
+        transition: width 60ms linear;
+      }
+
+      tr.row-detected .progress-fill {
+        background: var(--accent-amber);
+      }
+
+      .status-text {
+        font-weight: 600;
+        font-size: 0.76rem;
+      }
+
+      .status-idle {
+        color: var(--text-muted);
+      }
+
+      .status-scanning {
+        color: var(--accent-cyan);
+      }
+
+      .status-clear {
+        color: var(--accent-emerald);
+      }
+
+      .status-detected {
+        color: var(--accent-amber);
+      }
+
+      /* Responsive Reflow */
+      @media (max-width: 1220px) {
+        .workstation-body {
+          grid-template-columns: 280px minmax(0, 1fr);
+        }
+        .workbench-split {
+          grid-template-columns: 1fr;
+        }
+        .workbench-pane-inspector {
+          border-left: none;
+          border-top: 1px solid var(--border-hairline);
+        }
+      }
+
+      @media (max-width: 1080px) {
+        .canvas-grid {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto;
+        }
+        #epoch1Card,
+        #epoch2Card,
+        #subtractCard {
+          grid-column: auto;
+          grid-row: auto;
+        }
+      }
+
+      @media (max-width: 920px) {
+        .workstation-body {
+          grid-template-columns: 1fr;
+        }
+        .control-rail {
+          border-right: none;
+          border-bottom: 1px solid var(--border-hairline);
+        }
+      }
+
+      @media (max-width: 640px) {
+        .optical-stage,
+        .workbench-pane,
+        .detector-array-band,
+        .bench-toolbar {
+          padding-left: 14px;
+          padding-right: 14px;
+        }
+        .coord-matrix {
+          grid-template-columns: 1fr;
+        }
+        .coord-cell {
+          border-right: none;
+        }
+        .coord-cell:nth-last-child(-n + 2) {
+          border-bottom: 1px solid var(--border-hairline);
+        }
+        .coord-cell:last-child {
+          border-bottom: none;
+        }
+        .tile-matrix-strip {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .btn-row-2 {
+          grid-template-columns: 1fr;
+        }
+        button,
+        .file-slot {
+          min-height: 40px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="console-shell">
+      <div class="workstation-body">
+        <aside class="control-rail" aria-label="Pipeline controls">
+          <section class="rail-section">
+            <h2 class="section-kicker">Dataset</h2>
+            <div class="field-group">
+              <label class="field-label" for="presetSelect">Target Field</label>
+              <select id="presetSelect">
+                <option value="barnard">Barnard's Star (17h 57m 48.5s, +04&deg; 41' 36")</option>
+                <option value="wise0855">WISE 0855 (08h 55m 10.8s, -07&deg; 14' 42")</option>
+                <option value="epsindi">Epsilon Indi B (22h 04m 10.5s, -56&deg; 46' 58")</option>
+                <option value="planetx">Planet X Candidate (04h 12m 19.0s, +18&deg; 30' 05")</option>
+              </select>
+            </div>
+            <button type="button" id="loadPresetBtn" class="btn-block">Load Preset</button>
+            <div class="btn-row-2">
+              <label
+                class="file-slot"
+                title="Upload PNG, JPEG, WebP, or NASA FITS (.fits/.fit) Epoch 1 image"
+              >
+                <span>Upload Epoch 1</span>
+                <input
+                  type="file"
+                  id="uploadEpoch1"
+                  accept="image/*,.fits,.fit,.fts"
+                  aria-label="Upload Epoch 1 Image"
+                />
+              </label>
+              <label
+                class="file-slot"
+                title="Upload PNG, JPEG, WebP, or NASA FITS (.fits/.fit) Epoch 2 image"
+              >
+                <span>Upload Epoch 2</span>
+                <input
+                  type="file"
+                  id="uploadEpoch2"
+                  accept="image/*,.fits,.fit,.fts"
+                  aria-label="Upload Epoch 2 Image"
+                />
+              </label>
+            </div>
+          </section>
+
+          <section class="rail-section">
+            <h2 class="section-kicker">Actions</h2>
+            <button type="button" id="runSubtractionBtn" class="btn-primary-cyan btn-block">
+              Align &amp; Subtract
+            </button>
+            <button type="button" id="runScanBtn" class="btn-primary-amber btn-block">
+              Run 10-Zone Scan
+            </button>
+            <button type="button" id="blinkToggleBtn" class="btn-block" aria-pressed="false">
+              Blink Comparator
+            </button>
+          </section>
+
+          <section class="rail-section">
+            <h2 class="section-kicker">Parameters</h2>
+            <div class="field-group">
+              <div class="slider-header">
+                <label class="field-label" for="noiseThresholdSlider">Sigma Cutoff</label>
+                <span id="noiseThresholdValue" class="threshold-readout tabular-nums">5.0&sigma;</span>
+              </div>
+              <input
+                type="range"
+                id="noiseThresholdSlider"
+                min="3.0"
+                max="10.0"
+                step="0.2"
+                value="5.0"
+              />
+            </div>
+
+            <label
+              class="toggle-check"
+              title="Match field stars between Epoch 1 and Epoch 2 and warp Epoch 1 via bicubic resampling"
+            >
+              <input type="checkbox" id="autoAlignToggle" checked />
+              <span>Auto-Align Stars</span>
+            </label>
+
+            <label class="toggle-check">
+              <input type="checkbox" id="overlapGridToggle" checked />
+              <span id="overlapGridLabel">10-Zone Grid (150px)</span>
+            </label>
+
+            <button
+              type="button"
+              id="toggleAdvancedWcsBtn"
+              class="drawer-toggle-btn"
+              aria-expanded="false"
+              aria-controls="wcsCalibrationDrawer"
+            >
+              <span>WCS Settings</span>
+              <span class="tabular-nums" aria-hidden="true">+</span>
+            </button>
+
+            <div id="wcsCalibrationDrawer" class="wcs-calibration-drawer" aria-label="WCS calibration">
+              <div class="field-group">
+                <label class="field-label" for="wcsRaInput">Center RA (J2000)</label>
+                <input type="text" id="wcsRaInput" class="tabular-nums" value="17h 57m 55.5s" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="wcsDecInput">Center Dec (J2000)</label>
+                <input type="text" id="wcsDecInput" class="tabular-nums" value="+04&deg; 38' 34&quot;" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="wcsScaleInput">Scale (&Prime;/px)</label>
+                <input type="number" id="wcsScaleInput" class="tabular-nums" min="0.05" max="120" step="0.1" value="1.2" />
+              </div>
+              <div class="field-group">
+                <label class="field-label" for="subtractionModeSelect">Difference Mode</label>
+                <select id="subtractionModeSelect">
+                  <option value="abs">|Epoch 2 - Epoch 1| (Dipole)</option>
+                  <option value="signed">Epoch 2 - Epoch 1 (Positive)</option>
+                </select>
+              </div>
+              <label class="toggle-check" title="Match median sky level between Epoch 1 and Epoch 2">
+                <input type="checkbox" id="matchBgToggle" checked />
+                <span>Match Sky Background</span>
+              </label>
+            </div>
+          </section>
+
+          <section class="rail-section">
+            <h2 class="section-kicker">Telemetry</h2>
+            <div class="rail-telemetry-list tabular-nums">
+              <div class="rail-kv">
+                <span class="rail-k">Alignment</span>
+                <span id="regStatusText" class="rail-v">Pending</span>
+              </div>
+              <div class="rail-kv">
+                <span class="rail-k">Sky Noise</span>
+                <span id="skySigmaText" class="rail-v">MAD &sigma; = -- DN</span>
+              </div>
+              <div class="rail-kv">
+                <span class="rail-k">Cursor</span>
+                <span id="cursorProbeText" class="rail-v">X --, Y -- px</span>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <main class="optical-bench">
+          <div class="bench-toolbar">
+            <span id="pipelineStatusText" class="bench-status-line">
+              Barnard's Star loaded.
+            </span>
+            <div class="viewport-mode-bar" role="group" aria-label="Viewport layout">
+              <button type="button" id="viewSplitBtn" class="mode-tab is-active" aria-pressed="true">
+                Split View
+              </button>
+              <button type="button" id="viewFocusDiffBtn" class="mode-tab" aria-pressed="false">
+                Difference Only
+              </button>
+            </div>
+          </div>
+
+          <section class="optical-stage" aria-label="Image panels">
+            <div id="canvasGrid" class="canvas-grid">
+              <article class="canvas-pane epoch-source-pane" id="epoch1Card">
+                <div class="pane-bar">
+                  <h2 class="pane-title">Epoch 1 (Baseline)</h2>
+                  <span id="epoch1Meta" class="pane-meta tabular-nums">1200 &times; 600 px</span>
+                </div>
+                <div class="canvas-frame">
+                  <canvas id="epoch1Canvas" width="1200" height="600" data-testid="epoch1-canvas"></canvas>
+                </div>
+                <div class="pane-foot">
+                  <span>PNG / JPG / FITS</span>
+                  <span id="epoch1Tag" class="tabular-nums">MJD 60812.4</span>
+                </div>
+              </article>
+
+              <article class="canvas-pane epoch-source-pane" id="epoch2Card">
+                <div class="pane-bar">
+                  <h2 class="pane-title">Epoch 2 (Target)</h2>
+                  <span id="epoch2Meta" class="pane-meta tabular-nums">1200 &times; 600 px</span>
+                </div>
+                <div class="canvas-frame">
+                  <canvas id="epoch2Canvas" width="1200" height="600" data-testid="epoch2-canvas"></canvas>
+                </div>
+                <div class="pane-foot">
+                  <span>PNG / JPG / FITS</span>
+                  <span id="epoch2Tag" class="tabular-nums">MJD 60995.1</span>
+                </div>
+              </article>
+
+              <article class="canvas-pane" id="subtractCard">
+                <div class="pane-bar">
+                  <h2 class="pane-title">Difference (E2 &minus; E1)</h2>
+                  <span id="subtractMeta" class="pane-meta tabular-nums">Ready</span>
+                </div>
+                <div class="canvas-frame">
+                  <canvas id="subtractCanvas" width="1200" height="600" data-testid="subtract-canvas"></canvas>
+                </div>
+                <div class="pane-foot">
+                  <span id="subtractFootInfo" class="tabular-nums">Click source to inspect</span>
+                  <span id="subtractTag" class="tabular-nums">10-Zone Grid</span>
+                </div>
+              </article>
+            </div>
+
+            <section id="blinkPanel" class="blink-panel" aria-label="Blink Comparator">
+              <div class="blink-header">
+                <div class="blink-title-wrap">
+                  <h2>Blink Comparator</h2>
+                  <span id="blinkEpochLabel" class="blink-epoch-indicator">FRAME: EPOCH 1</span>
+                </div>
+                <div class="blink-controls">
+                  <label class="field-label" for="blinkSpeedSelect">Cadence</label>
+                  <select id="blinkSpeedSelect" aria-label="Blink speed">
+                    <option value="700">Slow (1.4 Hz)</option>
+                    <option value="420" selected>Normal (2.4 Hz)</option>
+                    <option value="220">Fast (4.5 Hz)</option>
+                  </select>
+                  <button type="button" id="stopBlinkBtn">Stop</button>
+                </div>
+              </div>
+              <div class="blink-viewport">
+                <canvas id="blinkCanvas" width="1200" height="600"></canvas>
+              </div>
+            </section>
+          </section>
+
+          <section class="workbench-split" aria-label="Catalog and inspector">
+            <div class="workbench-pane">
+              <div class="pane-heading-row">
+                <h2 class="pane-heading">Detected Sources (J2000)</h2>
+                <span id="catalogCountMeta" class="pane-sub tabular-nums">0 Sources</span>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Class</th>
+                      <th>RA (J2000)</th>
+                      <th>Dec (J2000)</th>
+                      <th>X, Y (px)</th>
+                      <th>Shift / PA</th>
+                      <th>SNR</th>
+                      <th>FWHM</th>
+                      <th>Zones</th>
+                    </tr>
+                  </thead>
+                  <tbody id="catalogTableBody">
+                    <tr>
+                      <td colspan="9" class="empty-table-cell">
+                        Run <strong>Align &amp; Subtract</strong> then <strong>Run 10-Zone Scan</strong>.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="workbench-pane workbench-pane-inspector">
+              <div class="pane-heading-row">
+                <h2 class="pane-heading">Source Inspector</h2>
+                <span id="wcsTargetLabel" class="pane-sub">WCS J2000</span>
+              </div>
+
+              <div class="coord-matrix">
+                <div class="coord-cell">
+                  <span class="coord-label">RA (J2000)</span>
+                  <span id="outRa" class="coord-value tabular-nums">--h --m --.-s</span>
+                </div>
+                <div class="coord-cell">
+                  <span class="coord-label">Dec (J2000)</span>
+                  <span id="outDec" class="coord-value tabular-nums">--&deg; --' --"</span>
+                </div>
+                <div class="coord-cell">
+                  <span class="coord-label">Centroid (X, Y)</span>
+                  <span id="outPixel" class="coord-value-sm tabular-nums">-- , -- px</span>
+                </div>
+                <div class="coord-cell">
+                  <span class="coord-label">Motion / PA</span>
+                  <span id="outMotion" class="coord-value-sm tabular-nums">--</span>
+                </div>
+                <div class="coord-cell">
+                  <span class="coord-label">Zones</span>
+                  <span id="outZones" class="coord-value-sm tabular-nums">Pending</span>
+                </div>
+                <div class="coord-cell">
+                  <span class="coord-label">SNR / FWHM / Conf</span>
+                  <span id="outSnr" class="coord-value-sm tabular-nums">-- &sigma; / -- px / -- %</span>
+                </div>
+              </div>
+
+              <div class="psf-inspector-row" aria-label="PSF cutout and slice">
+                <div class="psf-crop-box">
+                  <canvas id="psfCropCanvas" width="25" height="25"></canvas>
+                  <span class="coord-label" style="font-size: 0.63rem;">25&times;25 Cutout</span>
+                </div>
+                <div class="psf-profile-box">
+                  <div class="psf-profile-header">
+                    <span>PSF Profile</span>
+                    <span id="psfFluxLabel" class="tabular-nums">Flux: -- DN</span>
+                  </div>
+                  <canvas id="psfProfileCanvas" width="320" height="60"></canvas>
+                </div>
+              </div>
+
+              <div id="overlapBanner" class="overlap-banner">
+                Run Align &amp; Subtract then Run 10-Zone Scan to measure moving sources.
+              </div>
+
+              <div class="export-actions">
+                <button type="button" id="copyCoordsBtn">Copy Catalog</button>
+                <button type="button" id="exportCsvBtn">Export CSV</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="detector-array-band" aria-label="5x2 detector zone status">
+            <div class="pane-heading-row">
+              <h2 id="zoneArrayHeading" class="pane-heading">Zone Array (5&times;2 &middot; 150px Overlap)</h2>
+              <span id="scanSummaryMeta" class="pane-sub tabular-nums">0 / 10 Complete</span>
+            </div>
+
+            <div id="tileMatrixStrip" class="tile-matrix-strip" aria-label="Zone grid summary"></div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zone</th>
+                    <th>Bounds (px)</th>
+                    <th>Pixels Scanned</th>
+                    <th id="zoneOverlapHeader">150px Overlap Check</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tileTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        'use strict';
+
+        const PRESET_W = 1200;
+        const PRESET_H = 600;
+        const GRID_COLS = 5;
+        const GRID_ROWS = 2;
+        const PLATE_SCALE_DEFAULT = 1.2;
+
+        let frameWidth = PRESET_W;
+        let frameHeight = PRESET_H;
+        let activeOverlapPx = 150;
+        let halfOverlap = 75;
+
+        const NASA_PRESETS = {
+          barnard: {
+            key: 'barnard',
+            name: "Barnard's Star",
+            raStr: '17h 57m 48.5s',
+            decStr: '+04° 41\' 36"',
+            plateScaleArcsec: 1.2,
+            seed: 175748,
+            e1EpochTag: '2010.2 · MJD 55270',
+            e2EpochTag: '2025.2 · MJD 60749 (15.0 yr)',
+            bandNote: '15.0 yr · 10.39"/yr @ 355.6°',
+            drift: { dx: 0, dy: 0, thetaDeg: 0 },
+            // 155.9" over 15.0 yr = 129.9 px at 1.2"/px, PA 355.6 deg
+            movingBodies: [
+              { label: "Barnard's Star", e1x: 485.0, e1y: 277.5, e2x: 495, e2y: 148, radius: 3.1, peak: 205 },
+            ],
+          },
+          wise0855: {
+            key: 'wise0855',
+            name: 'WISE 0855',
+            raStr: '08h 55m 10.8s',
+            decStr: '-07° 14\' 42"',
+            plateScaleArcsec: 1.2,
+            seed: 85510,
+            e1EpochTag: '2010.3 · MJD 55300',
+            e2EpochTag: '2025.3 · MJD 60779 (15.0 yr)',
+            bandNote: '15.0 yr · 8.15"/yr @ 274.7°',
+            drift: { dx: 0, dy: 0, thetaDeg: 0 },
+            // 122.3" over 15.0 yr = 101.9 px at 1.2"/px, PA 274.7 deg
+            movingBodies: [
+              { label: 'WISE 0855', e1x: 738.4, e1y: 320.3, e2x: 840, e2y: 312, radius: 3.0, peak: 195 },
+            ],
+          },
+          epsindi: {
+            key: 'epsindi',
+            name: 'Epsilon Indi B',
+            raStr: '22h 04m 10.5s',
+            decStr: '-56° 46\' 58"',
+            plateScaleArcsec: 1.2,
+            seed: 220410,
+            e1EpochTag: '2007.4 · MJD 54250',
+            e2EpochTag: '2025.4 · MJD 60825 (18.0 yr)',
+            bandNote: '18.0 yr · 4.68"/yr @ 121.1°',
+            drift: { dx: 0, dy: 0, thetaDeg: 0 },
+            // 84.3" over 18.0 yr = 70.2 px at 1.2"/px, PA 121.1 deg
+            movingBodies: [
+              { label: 'Epsilon Indi B', e1x: 418.1, e1y: 435.7, e2x: 358, e2y: 472, radius: 3.1, peak: 200 },
+            ],
+          },
+          planetx: {
+            key: 'planetx',
+            name: 'Planet X Multi-Body Field',
+            raStr: '04h 12m 19.0s',
+            decStr: '+18° 30\' 05"',
+            plateScaleArcsec: 1.2,
+            seed: 41219,
+            e1EpochTag: 'Epoch 1 · Shifted (+12.5, -6.0 px, +1.1°)',
+            e2EpochTag: 'Epoch 2 · 3 Wide Movers (109"–149")',
+            bandNote: '3 Wide Targets · Shifted E1 (+12.5, -6.0 px, +1.1°)',
+            drift: { dx: 12.5, dy: -6.0, thetaDeg: 1.1 },
+            movingBodies: [
+              { label: 'Planet X Candidate', e1x: 576, e1y: 404, e2x: 688, e2y: 458, radius: 3.2, peak: 210 },
+              { label: 'TNO-2025B', e1x: 388, e1y: 128, e2x: 486, e2y: 152, radius: 3.0, peak: 185 },
+              { label: 'MBA-C', e1x: 882, e1y: 260, e2x: 966, e2y: 294, radius: 2.9, peak: 175 },
+            ],
+          },
+        };
+
+        // DOM references
+        const presetSelect = document.getElementById('presetSelect');
+        const loadPresetBtn = document.getElementById('loadPresetBtn');
+        const uploadEpoch1Input = document.getElementById('uploadEpoch1');
+        const uploadEpoch2Input = document.getElementById('uploadEpoch2');
+        const toggleAdvancedWcsBtn = document.getElementById('toggleAdvancedWcsBtn');
+        const wcsCalibrationDrawer = document.getElementById('wcsCalibrationDrawer');
+        const wcsRaInput = document.getElementById('wcsRaInput');
+        const wcsDecInput = document.getElementById('wcsDecInput');
+        const wcsScaleInput = document.getElementById('wcsScaleInput');
+        const subtractionModeSelect = document.getElementById('subtractionModeSelect');
+        const matchBgToggle = document.getElementById('matchBgToggle');
+        const autoAlignToggle = document.getElementById('autoAlignToggle');
+        const runSubtractionBtn = document.getElementById('runSubtractionBtn');
+        const runScanBtn = document.getElementById('runScanBtn');
+        const blinkToggleBtn = document.getElementById('blinkToggleBtn');
+        const stopBlinkBtn = document.getElementById('stopBlinkBtn');
+        const blinkSpeedSelect = document.getElementById('blinkSpeedSelect');
+        const blinkPanel = document.getElementById('blinkPanel');
+        const blinkEpochLabel = document.getElementById('blinkEpochLabel');
+        const noiseSlider = document.getElementById('noiseThresholdSlider');
+        const noiseValueLabel = document.getElementById('noiseThresholdValue');
+        const overlapGridToggle = document.getElementById('overlapGridToggle');
+        const overlapGridLabel = document.getElementById('overlapGridLabel');
+        const pipelineStatusText = document.getElementById('pipelineStatusText');
+        const regStatusText = document.getElementById('regStatusText');
+        const cursorProbeText = document.getElementById('cursorProbeText');
+
+        const viewSplitBtn = document.getElementById('viewSplitBtn');
+        const viewFocusDiffBtn = document.getElementById('viewFocusDiffBtn');
+        const canvasGrid = document.getElementById('canvasGrid');
+
+        const epoch1Card = document.getElementById('epoch1Card');
+        const epoch2Card = document.getElementById('epoch2Card');
+        const epoch1Canvas = document.getElementById('epoch1Canvas');
+        const epoch2Canvas = document.getElementById('epoch2Canvas');
+        const subtractCanvas = document.getElementById('subtractCanvas');
+        const blinkCanvas = document.getElementById('blinkCanvas');
+        const psfCropCanvas = document.getElementById('psfCropCanvas');
+        const psfProfileCanvas = document.getElementById('psfProfileCanvas');
+
+        const epoch1Ctx = epoch1Canvas.getContext('2d', { willReadFrequently: true });
+        const epoch2Ctx = epoch2Canvas.getContext('2d', { willReadFrequently: true });
+        const subtractCtx = subtractCanvas.getContext('2d', { willReadFrequently: true });
+        const blinkCtx = blinkCanvas.getContext('2d');
+        const psfCropCtx = psfCropCanvas.getContext('2d');
+        const psfProfileCtx = psfProfileCanvas.getContext('2d');
+
+        const alignedEpoch1Canvas = document.createElement('canvas');
+        alignedEpoch1Canvas.width = frameWidth;
+        alignedEpoch1Canvas.height = frameHeight;
+        const alignedEpoch1Ctx = alignedEpoch1Canvas.getContext('2d', { willReadFrequently: true });
+
+        const epoch1Meta = document.getElementById('epoch1Meta');
+        const epoch2Meta = document.getElementById('epoch2Meta');
+        const epoch1Tag = document.getElementById('epoch1Tag');
+        const epoch2Tag = document.getElementById('epoch2Tag');
+        const subtractMeta = document.getElementById('subtractMeta');
+        const subtractTag = document.getElementById('subtractTag');
+        const skySigmaText = document.getElementById('skySigmaText');
+        const wcsTargetLabel = document.getElementById('wcsTargetLabel');
+        const zoneArrayHeading = document.getElementById('zoneArrayHeading');
+        const zoneOverlapHeader = document.getElementById('zoneOverlapHeader');
+        const scanSummaryMeta = document.getElementById('scanSummaryMeta');
+        const catalogCountMeta = document.getElementById('catalogCountMeta');
+        const tileMatrixStrip = document.getElementById('tileMatrixStrip');
+        const tileTableBody = document.getElementById('tileTableBody');
+        const catalogTableBody = document.getElementById('catalogTableBody');
+        const psfFluxLabel = document.getElementById('psfFluxLabel');
+
+        const outRa = document.getElementById('outRa');
+        const outDec = document.getElementById('outDec');
+        const outPixel = document.getElementById('outPixel');
+        const outMotion = document.getElementById('outMotion');
+        const outZones = document.getElementById('outZones');
+        const outSnr = document.getElementById('outSnr');
+        const overlapBanner = document.getElementById('overlapBanner');
+        const copyCoordsBtn = document.getElementById('copyCoordsBtn');
+        const exportCsvBtn = document.getElementById('exportCsvBtn');
+
+        let zones = buildTenTileZones();
+        let activeContext = {
+          label: NASA_PRESETS.barnard.name,
+          centerRaDeg: 0,
+          centerDecDeg: 0,
+          plateScaleArcsec: PLATE_SCALE_DEFAULT,
+          isCustomUpload: false,
+        };
+        let rawCustomEpochs = { 1: null, 2: null };
+        let hasSubtracted = false;
+        let cleanSubtractedImageData = null;
+        let posSignalMap = null;
+        let negSignalMap = null;
+        let lastAlignedLum = null;
+        let lastEpoch2Lum = null;
+        let lastSkySigma = 0;
+        let lastThresholdDn = 0;
+        let lastSigmaMultiplier = 5.0;
+        let lastAlignment = {
+          dx: 0,
+          dy: 0,
+          dThetaRad: 0,
+          dThetaDeg: 0,
+          matchedStars: 0,
+          rmsPx: 0,
+          applied: false,
+        };
+        let tileResults = createInitialTileStates();
+        let allDetections = [];
+        let selectedDetectionIdx = 0;
+        let scanAnimId = null;
+        let isScanning = false;
+        let blinkTimerId = null;
+        let blinkShowingEpoch1 = true;
+
+        function setWorkingResolution(w, h) {
+          const nw = Math.max(64, Math.round(w));
+          const nh = Math.max(64, Math.round(h));
+          frameWidth = nw;
+          frameHeight = nh;
+          activeOverlapPx =
+            nw >= 900 && nh >= 400
+              ? 150
+              : Math.max(24, Math.min(150, Math.round(Math.min(nw / 8, nh / 4))));
+          halfOverlap = Math.floor(activeOverlapPx / 2);
+
+          for (const cv of [
+            epoch1Canvas,
+            epoch2Canvas,
+            subtractCanvas,
+            blinkCanvas,
+            alignedEpoch1Canvas,
+          ]) {
+            if (cv.width !== nw || cv.height !== nh) {
+              cv.width = nw;
+              cv.height = nh;
+            }
+          }
+
+          const ratioStr = `${nw} / ${nh}`;
+          for (const cv of [epoch1Canvas, epoch2Canvas, subtractCanvas, blinkCanvas]) {
+            if (cv.parentElement) {
+              cv.parentElement.style.aspectRatio = ratioStr;
+            }
+          }
+
+          if (overlapGridLabel) {
+            overlapGridLabel.textContent = `10-Zone Grid (${activeOverlapPx}px)`;
+          }
+          if (zoneArrayHeading) {
+            zoneArrayHeading.textContent = `Zone Array (5×2 · ${activeOverlapPx}px Overlap)`;
+          }
+          if (zoneOverlapHeader) {
+            zoneOverlapHeader.textContent = `${activeOverlapPx}px Overlap Check`;
+          }
+
+          zones = buildTenTileZones();
+          tileResults = createInitialTileStates();
+        }
+
+        function mulberry32(seed) {
+          let a = seed >>> 0;
+          return function () {
+            a |= 0;
+            a = (a + 0x6d2b79f5) | 0;
+            let t = Math.imul(a ^ (a >>> 15), 1 | a);
+            t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+            return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+          };
+        }
+
+        function buildTenTileZones() {
+          const colW = frameWidth / GRID_COLS;
+          const rowH = frameHeight / GRID_ROWS;
+          const list = [];
+          for (let r = 0; r < GRID_ROWS; r++) {
+            for (let c = 0; c < GRID_COLS; c++) {
+              const id = r * GRID_COLS + c + 1;
+              const baseX0 = Math.round(c * colW);
+              const baseX1 = Math.round((c + 1) * colW);
+              const baseY0 = Math.round(r * rowH);
+              const baseY1 = Math.round((r + 1) * rowH);
+              const x0 = c > 0 ? Math.max(0, baseX0 - halfOverlap) : 0;
+              const x1 = c < GRID_COLS - 1 ? Math.min(frameWidth, baseX1 + halfOverlap) : frameWidth;
+              const y0 = r > 0 ? Math.max(0, baseY0 - halfOverlap) : 0;
+              const y1 = r < GRID_ROWS - 1 ? Math.min(frameHeight, baseY1 + halfOverlap) : frameHeight;
+              list.push({
+                id,
+                row: r,
+                col: c,
+                baseX0,
+                baseY0,
+                baseX1,
+                baseY1,
+                x0,
+                y0,
+                x1,
+                y1,
+                pixelCount: (x1 - x0) * (y1 - y0),
+              });
+            }
+          }
+          return list;
+        }
+
+        function createInitialTileStates() {
+          return zones.map((z) => ({
+            zone: z,
+            scannedPixels: 0,
+            overlapStatus: 'Standby',
+            confidence: null,
+            status: 'Idle',
+            candidates: [],
+          }));
+        }
+
+        function parseRaToDeg(raStr) {
+          const trimmed = String(raStr || '').trim();
+          const hms = trimmed.match(/(\d+)h\s*(\d+)m\s*([\d.]+)s/i);
+          if (hms) {
+            return (Number(hms[1]) + Number(hms[2]) / 60 + Number(hms[3]) / 3600) * 15;
+          }
+          const colon = trimmed.match(/^(\d+)[:\s]+(\d+)[:\s]+([\d.]+)$/);
+          if (colon) {
+            return (Number(colon[1]) + Number(colon[2]) / 60 + Number(colon[3]) / 3600) * 15;
+          }
+          const deg = Number(trimmed);
+          return Number.isFinite(deg) ? ((deg % 360) + 360) % 360 : 0;
+        }
+
+        function parseDecToDeg(decStr) {
+          const trimmed = String(decStr || '').trim();
+          const dms = trimmed.match(/([+-]?)(\d+)[°d\s]+(\d+)['m\s]+([\d.]+)["s]?/i);
+          if (dms) {
+            const sign = dms[1] === '-' ? -1 : 1;
+            return sign * (Number(dms[2]) + Number(dms[3]) / 60 + Number(dms[4]) / 3600);
+          }
+          const colon = trimmed.match(/^([+-]?)(\d+)[:\s]+(\d+)[:\s]+([\d.]+)$/);
+          if (colon) {
+            const sign = colon[1] === '-' ? -1 : 1;
+            return sign * (Number(colon[2]) + Number(colon[3]) / 60 + Number(colon[4]) / 3600);
+          }
+          const deg = Number(trimmed);
+          return Number.isFinite(deg) ? Math.max(-90, Math.min(90, deg)) : 0;
+        }
+
+        function formatRa(raDeg) {
+          const totalHours = (((raDeg / 15) % 24) + 24) % 24;
+          const h = Math.floor(totalHours);
+          const mFloat = (totalHours - h) * 60;
+          const m = Math.floor(mFloat);
+          const s = (mFloat - m) * 60;
+          const sRounded = Math.round(s * 10) / 10;
+          const finalS = sRounded >= 60 ? 0 : sRounded;
+          const finalM = sRounded >= 60 ? (m + 1) % 60 : m;
+          const finalH = sRounded >= 60 && m + 1 >= 60 ? (h + 1) % 24 : h;
+          return `${String(finalH).padStart(2, '0')}h ${String(finalM).padStart(2, '0')}m ${finalS.toFixed(1).padStart(4, '0')}s`;
+        }
+
+        function formatDec(decDeg) {
+          const sign = decDeg >= 0 ? '+' : '-';
+          const abs = Math.abs(decDeg);
+          const d = Math.floor(abs);
+          const mFloat = (abs - d) * 60;
+          const m = Math.floor(mFloat);
+          const s = Math.round((mFloat - m) * 60);
+          const finalS = s === 60 ? 0 : s;
+          const finalM = s === 60 ? (m + 1) % 60 : m;
+          const finalD = s === 60 && m + 1 >= 60 ? d + 1 : d;
+          return `${sign}${String(finalD).padStart(2, '0')}° ${String(finalM).padStart(2, '0')}' ${String(finalS).padStart(2, '0')}"`;
+        }
+
+        function pixelToWcsRaDec(px, py, centerRaDeg, centerDecDeg, plateScaleArcsec) {
+          const degPerPx = (plateScaleArcsec || PLATE_SCALE_DEFAULT) / 3600;
+          const dxDeg = -(px - frameWidth / 2) * degPerPx;
+          const dyDeg = -(py - frameHeight / 2) * degPerPx;
+          const ra0Rad = (centerRaDeg * Math.PI) / 180;
+          const dec0Rad = (centerDecDeg * Math.PI) / 180;
+          const xi = (dxDeg * Math.PI) / 180;
+          const eta = (dyDeg * Math.PI) / 180;
+
+          const denom = Math.cos(dec0Rad) - eta * Math.sin(dec0Rad);
+          const raRad = ra0Rad + Math.atan2(xi, denom);
+          const decRad = Math.atan2(
+            Math.sin(dec0Rad) + eta * Math.cos(dec0Rad),
+            Math.hypot(xi, denom)
+          );
+
+          let raDeg = ((raRad * 180) / Math.PI) % 360;
+          if (raDeg < 0) raDeg += 360;
+          const decDeg = (decRad * 180) / Math.PI;
+
+          return {
+            raDeg,
+            decDeg,
+            raFormatted: formatRa(raDeg),
+            decFormatted: formatDec(decDeg),
+          };
+        }
+
+        function computeFieldCenterForTarget(targetRaDeg, targetDecDeg, tx, ty, plateScaleArcsec) {
+          let ra0 = targetRaDeg;
+          let dec0 = targetDecDeg;
+          for (let iter = 0; iter < 12; iter++) {
+            const proj = pixelToWcsRaDec(tx, ty, ra0, dec0, plateScaleArcsec);
+            let dRa = targetRaDeg - proj.raDeg;
+            if (dRa > 180) dRa -= 360;
+            if (dRa < -180) dRa += 360;
+            const dDec = targetDecDeg - proj.decDeg;
+            ra0 = (ra0 + dRa + 360) % 360;
+            dec0 = Math.max(-89.999, Math.min(89.999, dec0 + dDec));
+            if (Math.abs(dRa) < 1e-8 && Math.abs(dDec) < 1e-8) break;
+          }
+          return { centerRaDeg: ra0, centerDecDeg: dec0 };
+        }
+
+        function syncWcsInputsFromContext() {
+          wcsRaInput.value = formatRa(activeContext.centerRaDeg);
+          wcsDecInput.value = formatDec(activeContext.centerDecDeg);
+          wcsScaleInput.value = String(Number(activeContext.plateScaleArcsec.toFixed(2)));
+        }
+
+        function applyManualWcsCalibration() {
+          activeContext.centerRaDeg = parseRaToDeg(wcsRaInput.value);
+          activeContext.centerDecDeg = parseDecToDeg(wcsDecInput.value);
+          const scale = Number(wcsScaleInput.value);
+          if (Number.isFinite(scale) && scale > 0) {
+            activeContext.plateScaleArcsec = scale;
+          }
+          if (allDetections.length > 0) {
+            renderUnifiedCatalogTable();
+            updateFocusedSourceReadout();
+            redrawSubtractCanvas(0);
+          }
+          pipelineStatusText.textContent = `WCS calibrated: Center ${formatRa(activeContext.centerRaDeg)}, ${formatDec(activeContext.centerDecDeg)} at ${activeContext.plateScaleArcsec}"/px.`;
+        }
+
+        function parseFitsBuffer(buffer) {
+          const bytes = new Uint8Array(buffer);
+          const decoder = new TextDecoder('ascii');
+          let offset = 0;
+          let headerDone = false;
+          const headerCards = {};
+
+          while (!headerDone && offset + 2880 <= bytes.length) {
+            const blockStr = decoder.decode(bytes.subarray(offset, offset + 2880));
+            for (let c = 0; c < 36; c++) {
+              const card = blockStr.slice(c * 80, (c + 1) * 80);
+              const key = card.slice(0, 8).trim();
+              if (key === 'END') {
+                headerDone = true;
+                break;
+              }
+              if (card[8] === '=' && key) {
+                let valPart = card.slice(10).trim();
+                if (valPart.startsWith("'")) {
+                  const endQuote = valPart.indexOf("'", 1);
+                  valPart = endQuote > 0 ? valPart.slice(1, endQuote).trim() : valPart;
+                } else {
+                  const slashIdx = valPart.indexOf('/');
+                  if (slashIdx >= 0) valPart = valPart.slice(0, slashIdx).trim();
+                }
+                headerCards[key] = valPart;
+              }
+            }
+            offset += 2880;
+          }
+
+          const bitpix = Number(headerCards.BITPIX);
+          const naxis = Number(headerCards.NAXIS || 0);
+          const width = Number(headerCards.NAXIS1 || 0);
+          const height = Number(headerCards.NAXIS2 || 0);
+          const bscale = headerCards.BSCALE !== undefined ? Number(headerCards.BSCALE) : 1;
+          const bzero = headerCards.BZERO !== undefined ? Number(headerCards.BZERO) : 0;
+
+          if (!headerDone || naxis < 2 || width <= 0 || height <= 0 || !Number.isFinite(bitpix)) {
+            throw new Error('Invalid or unsupported 2D FITS file');
+          }
+
+          const totalPixels = width * height;
+          const bytesPerPx = Math.abs(bitpix) / 8;
+          if (offset + totalPixels * bytesPerPx > bytes.length) {
+            throw new Error('Truncated FITS pixel payload');
+          }
+
+          const view = new DataView(buffer, offset, totalPixels * bytesPerPx);
+          const raw = new Float32Array(totalPixels);
+
+          for (let i = 0; i < totalPixels; i++) {
+            const bytePos = i * bytesPerPx;
+            let v = 0;
+            if (bitpix === 8) v = view.getUint8(bytePos);
+            else if (bitpix === 16) v = view.getInt16(bytePos, false);
+            else if (bitpix === 32) v = view.getInt32(bytePos, false);
+            else if (bitpix === -32) v = view.getFloat32(bytePos, false);
+            else if (bitpix === -64) v = view.getFloat64(bytePos, false);
+            else throw new Error(`Unsupported BITPIX=${bitpix}`);
+            raw[i] = Number.isFinite(v) ? v * bscale + bzero : 0;
+          }
+
+          const sampleStep = Math.max(1, Math.floor(totalPixels / 8192));
+          const samples = [];
+          for (let i = 0; i < totalPixels; i += sampleStep) {
+            if (Number.isFinite(raw[i])) samples.push(raw[i]);
+          }
+          samples.sort((a, b) => a - b);
+          const pLow = samples[Math.floor(samples.length * 0.15)] ?? 0;
+          const pHigh = samples[Math.floor(samples.length * 0.996)] ?? pLow + 1;
+          const span = Math.max(1e-6, pHigh - pLow);
+
+          const rgba = new Uint8ClampedArray(totalPixels * 4);
+          for (let y = 0; y < height; y++) {
+            const srcY = height - 1 - y;
+            for (let x = 0; x < width; x++) {
+              const srcVal = raw[srcY * width + x];
+              const norm = Math.max(0, (srcVal - pLow) / span);
+              const stretched = Math.min(1, Math.asinh(norm * 10) / Math.asinh(10));
+              const dn = Math.round(stretched * 255);
+              const idx = (y * width + x) * 4;
+              rgba[idx] = dn;
+              rgba[idx + 1] = dn;
+              rgba[idx + 2] = Math.min(255, Math.round(dn * 1.04));
+              rgba[idx + 3] = 255;
+            }
+          }
+
+          let plateScaleArcsec = undefined;
+          const cdelt1 = Number(headerCards.CDELT1 || headerCards.CD1_1);
+          if (Number.isFinite(cdelt1) && cdelt1 !== 0) {
+            plateScaleArcsec = Math.abs(cdelt1) * 3600;
+          }
+
+          const crval1 = headerCards.CRVAL1 !== undefined ? Number(headerCards.CRVAL1) : undefined;
+          const crval2 = headerCards.CRVAL2 !== undefined ? Number(headerCards.CRVAL2) : undefined;
+
+          return {
+            width,
+            height,
+            bitpix,
+            rgba,
+            objectName: headerCards.OBJECT,
+            crval1: Number.isFinite(crval1) ? crval1 : undefined,
+            crval2: Number.isFinite(crval2) ? crval2 : undefined,
+            plateScaleArcsec,
+          };
+        }
+
+        function drawSourceNativeCentered(sourceElement, srcW, srcH, targetCtx) {
+          targetCtx.fillStyle = '#040507';
+          targetCtx.fillRect(0, 0, frameWidth, frameHeight);
+          const dx = Math.floor((frameWidth - srcW) / 2);
+          const dy = Math.floor((frameHeight - srcH) / 2);
+          targetCtx.drawImage(sourceElement, dx, dy, srcW, srcH);
+        }
+
+        // Deterministic synthetic plate renderer supporting multi-body proper motion + telescope drift
+        function renderAstrometricPlate(plate) {
+          const rand = mulberry32(plate.seed);
+          const stars = [];
+          let attempts = 0;
+          while (stars.length < 110 && attempts < 700) {
+            attempts++;
+            const sx = 24 + rand() * (frameWidth - 48);
+            const sy = 24 + rand() * (frameHeight - 48);
+            const nearMoving = plate.movingBodies.some(
+              (b) =>
+                Math.hypot(sx - b.e2x, sy - b.e2y) < 18 ||
+                Math.hypot(sx - b.e1x, sy - b.e1y) < 18
+            );
+            if (nearMoving) continue;
+
+            const spectralPick = rand();
+            let color = [215, 228, 255];
+            if (spectralPick < 0.35) color = [255, 214, 174];
+            else if (spectralPick < 0.65) color = [252, 245, 228];
+            else if (spectralPick < 0.85) color = [184, 224, 255];
+
+            stars.push({
+              x: sx,
+              y: sy,
+              radius: 2.0 + Math.pow(rand(), 2.2) * 3.0,
+              brightness: 0.42 + rand() * 0.54,
+              color,
+            });
+          }
+
+          const clouds = [];
+          for (let i = 0; i < 4; i++) {
+            clouds.push({
+              x: rand() * frameWidth,
+              y: rand() * frameHeight,
+              r: 150 + rand() * 170,
+              alpha: 0.025 + rand() * 0.025,
+            });
+          }
+
+          const drift = plate.drift || { dx: 0, dy: 0, thetaDeg: 0 };
+          const thetaRad = (drift.thetaDeg * Math.PI) / 180;
+          const cosT = Math.cos(thetaRad);
+          const sinT = Math.sin(thetaRad);
+          const cx0 = frameWidth / 2;
+          const cy0 = frameHeight / 2;
+
+          function toE1Frame(x2, y2) {
+            const rx = x2 - cx0;
+            const ry = y2 - cy0;
+            return {
+              x: cx0 + rx * cosT - ry * sinT + drift.dx,
+              y: cy0 + rx * sinT + ry * cosT + drift.dy,
+            };
+          }
+
+          const starsE1 = stars.map((s) => {
+            const p1 = toE1Frame(s.x, s.y);
+            return { ...s, x: p1.x, y: p1.y };
+          });
+
+          const cloudsE1 = clouds.map((c) => {
+            const p1 = toE1Frame(c.x, c.y);
+            return { ...c, x: p1.x, y: p1.y };
+          });
+
+          const bodiesE1 = plate.movingBodies.map((b) => {
+            const p1 = toE1Frame(b.e1x, b.e1y);
+            return { x: p1.x, y: p1.y, radius: b.radius, peak: b.peak };
+          });
+
+          const bodiesE2 = plate.movingBodies.map((b) => ({
+            x: b.e2x,
+            y: b.e2y,
+            radius: b.radius,
+            peak: b.peak,
+          }));
+
+          drawPlateEpoch(epoch1Ctx, starsE1, cloudsE1, bodiesE1, plate.seed + 101, 10);
+          drawPlateEpoch(epoch2Ctx, stars, clouds, bodiesE2, plate.seed + 202, 16);
+
+          alignedEpoch1Ctx.clearRect(0, 0, frameWidth, frameHeight);
+          alignedEpoch1Ctx.drawImage(epoch1Canvas, 0, 0);
+
+          epoch1Meta.textContent = `${frameWidth} × ${frameHeight} px`;
+          epoch2Meta.textContent = `${frameWidth} × ${frameHeight} px`;
+        }
+
+        function drawPlateEpoch(ctx, stars, clouds, movingBodies, noiseSeed, skyBaseOffset) {
+          ctx.fillStyle = `rgb(${6 + Math.round(skyBaseOffset * 0.25)}, ${9 + Math.round(skyBaseOffset * 0.3)}, ${18 + Math.round(skyBaseOffset * 0.4)})`;
+          ctx.fillRect(0, 0, frameWidth, frameHeight);
+
+          for (const c of clouds) {
+            const grad = ctx.createRadialGradient(c.x, c.y, 4, c.x, c.y, c.r);
+            grad.addColorStop(0, `rgba(42, 74, 128, ${c.alpha})`);
+            grad.addColorStop(1, 'rgba(7, 11, 20, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, frameWidth, frameHeight);
+          }
+
+          for (const s of stars) {
+            const [r, g, b] = s.color;
+            const span = s.radius * 3.1;
+            const halo = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, span);
+            halo.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${Math.min(0.95, s.brightness + 0.12)})`);
+            halo.addColorStop(0.38, `rgba(${r}, ${g}, ${b}, ${s.brightness * 0.42})`);
+            halo.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+            ctx.fillStyle = halo;
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, span, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          for (const body of movingBodies) {
+            const span = body.radius * 3.2;
+            const alphaCenter = Math.min(0.96, body.peak / 230);
+            const targetGrad = ctx.createRadialGradient(
+              body.x + 0.5,
+              body.y + 0.5,
+              0,
+              body.x + 0.5,
+              body.y + 0.5,
+              span
+            );
+            targetGrad.addColorStop(0, `rgba(218, 248, 255, ${alphaCenter})`);
+            targetGrad.addColorStop(0.38, `rgba(118, 226, 248, ${alphaCenter * 0.52})`);
+            targetGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+            ctx.fillStyle = targetGrad;
+            ctx.beginPath();
+            ctx.arc(body.x + 0.5, body.y + 0.5, span, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          const img = ctx.getImageData(0, 0, frameWidth, frameHeight);
+          const data = img.data;
+          let n = noiseSeed >>> 0;
+          for (let i = 0; i < data.length; i += 4) {
+            n = (Math.imul(1664525, n) + 1013904223) | 0;
+            const u1 = ((n >>> 16) & 0xff) / 255 - 0.5;
+            n = (Math.imul(1664525, n) + 1013904223) | 0;
+            const u2 = ((n >>> 16) & 0xff) / 255 - 0.5;
+            const jitter = (u1 + u2) * 5.5;
+            data[i] = Math.max(0, Math.min(255, data[i] + jitter));
+            data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + jitter));
+            data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + jitter));
+            data[i + 3] = 255;
+          }
+          ctx.putImageData(img, 0, 0);
+        }
+
+        // --- Pure Browser Star-Matching Registration & Bicubic Resampling Engine ---
+        function computeLuminanceArray(rgba, totalPixels) {
+          const lum = new Float32Array(totalPixels);
+          for (let p = 0; p < totalPixels; p++) {
+            const i = p * 4;
+            lum[p] = rgba[i + 3] === 0 ? 0 : 0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2];
+          }
+          return lum;
+        }
+
+        function estimateMedianAndMad(values, stride) {
+          const sample = [];
+          for (let i = 0; i < values.length; i += stride) {
+            sample.push(values[i]);
+          }
+          if (sample.length === 0) return { median: 0, madSigma: 1 };
+          sample.sort((a, b) => a - b);
+          const median = sample[Math.floor(sample.length / 2)];
+          const absDev = sample.map((v) => Math.abs(v - median)).sort((a, b) => a - b);
+          const mad = absDev[Math.floor(absDev.length / 2)];
+          return { median, madSigma: Math.max(0.6, 1.4826 * mad) };
+        }
+
+        function extractReferenceStars(rgba, width, height, maxStars = 56) {
+          const lum = computeLuminanceArray(rgba, width * height);
+          const { median, madSigma } = estimateMedianAndMad(lum, 16);
+          const minProminence = Math.max(14, 4.5 * madSigma);
+          const minAbsVal = median + Math.max(8, 2.5 * madSigma);
+          const peaks = [];
+          const margin = 10;
+          const ringR = 5;
+
+          for (let y = margin; y < height - margin; y++) {
+            const row = y * width;
+            for (let x = margin; x < width - margin; x++) {
+              const p = row + x;
+              if (rgba[p * 4 + 3] === 0) continue;
+              const val = lum[p];
+              if (val < minAbsVal) continue;
+              if (
+                val >= lum[row + x - 1] &&
+                val >= lum[row + x + 1] &&
+                val >= lum[(y - 1) * width + x] &&
+                val >= lum[(y + 1) * width + x] &&
+                val >= lum[(y - 1) * width + x - 1] &&
+                val >= lum[(y - 1) * width + x + 1] &&
+                val >= lum[(y + 1) * width + x - 1] &&
+                val >= lum[(y + 1) * width + x + 1]
+              ) {
+                const sxMean = 0.5 * (lum[row + x - ringR] + lum[row + x + ringR]);
+                const syMean = 0.5 * (lum[(y - ringR) * width + x] + lum[(y + ringR) * width + x]);
+                const localSky = Math.min(sxMean, syMean);
+                const prom = val - localSky;
+                if (prom < minProminence) continue;
+                const score = val >= 253 ? prom * 0.72 : prom;
+                peaks.push({ x, y, val, prom, localSky, score });
+              }
+            }
+          }
+
+          peaks.sort((a, b) => b.score - a.score);
+          const stars = [];
+          const gridCounts = new Uint16Array(16);
+          const perCellCap = Math.max(2, Math.ceil(maxStars / 12));
+
+          function tryAccept(pk, enforceCellCap) {
+            const cellX = Math.min(3, Math.floor((pk.x / width) * 4));
+            const cellY = Math.min(3, Math.floor((pk.y / height) * 4));
+            const cellIdx = cellY * 4 + cellX;
+            if (enforceCellCap && gridCounts[cellIdx] >= perCellCap) return false;
+            if (stars.some((s) => Math.hypot(s.x - pk.x, s.y - pk.y) < 15)) return false;
+
+            let wSum = 0;
+            let wx = 0;
+            let wy = 0;
+            const base = pk.localSky;
+            for (let dy = -3; dy <= 3; dy++) {
+              for (let dx = -3; dx <= 3; dx++) {
+                const v = Math.max(0, lum[(pk.y + dy) * width + (pk.x + dx)] - base);
+                wSum += v;
+                wx += (pk.x + dx) * v;
+                wy += (pk.y + dy) * v;
+              }
+            }
+            if (wSum <= 0) return false;
+            stars.push({ x: wx / wSum, y: wy / wSum, flux: wSum, peak: pk.prom });
+            gridCounts[cellIdx]++;
+            return true;
+          }
+
+          for (const pk of peaks) {
+            tryAccept(pk, true);
+            if (stars.length >= maxStars) break;
+          }
+          if (stars.length < maxStars) {
+            for (const pk of peaks) {
+              tryAccept(pk, false);
+              if (stars.length >= maxStars) break;
+            }
+          }
+
+          return stars;
+        }
+
+        function wrapAngleRad(a) {
+          while (a > Math.PI) a -= 2 * Math.PI;
+          while (a < -Math.PI) a += 2 * Math.PI;
+          return a;
+        }
+
+        function solveRigidLeastSquares(pairs, cx0, cy0) {
+          const n = pairs.length;
+          let mx1 = 0;
+          let my1 = 0;
+          let mx2 = 0;
+          let my2 = 0;
+          for (const p of pairs) {
+            mx1 += p.x1;
+            my1 += p.y1;
+            mx2 += p.x2;
+            my2 += p.y2;
+          }
+          mx1 /= n;
+          my1 /= n;
+          mx2 /= n;
+          my2 /= n;
+
+          let sCos = 0;
+          let sSin = 0;
+          for (const p of pairs) {
+            const ux = p.x2 - mx2;
+            const uy = p.y2 - my2;
+            const vx = p.x1 - mx1;
+            const vy = p.y1 - my1;
+            sCos += ux * vx + uy * vy;
+            sSin += ux * vy - uy * vx;
+          }
+          const theta = Math.atan2(sSin, sCos);
+          const cosT = Math.cos(theta);
+          const sinT = Math.sin(theta);
+
+          const rxMean = mx2 - cx0;
+          const ryMean = my2 - cy0;
+          const dx = mx1 - (cx0 + rxMean * cosT - ryMean * sinT);
+          const dy = my1 - (cy0 + rxMean * sinT + ryMean * cosT);
+
+          let errSq = 0;
+          for (const p of pairs) {
+            const rx = p.x2 - cx0;
+            const ry = p.y2 - cy0;
+            const predX = cx0 + rx * cosT - ry * sinT + dx;
+            const predY = cy0 + rx * sinT + ry * cosT + dy;
+            const ex = predX - p.x1;
+            const ey = predY - p.y1;
+            errSq += ex * ex + ey * ey;
+          }
+
+          return { dx, dy, dThetaRad: theta, rmsPx: Math.sqrt(errSq / n) };
+        }
+
+        function solveStarMatchedTransform(starsE1, starsE2, width, height) {
+          if (starsE1.length < 3 || starsE2.length < 3) {
+            return { dx: 0, dy: 0, dThetaRad: 0, dThetaDeg: 0, matchedStars: 0, rmsPx: 0, applied: false };
+          }
+
+          const cx0 = width / 2;
+          const cy0 = height / 2;
+
+          const transVotes = new Map();
+          for (const s1 of starsE1) {
+            for (const s2 of starsE2) {
+              const dx = s1.x - s2.x;
+              const dy = s1.y - s2.y;
+              if (Math.abs(dx) > width * 0.45 || Math.abs(dy) > height * 0.45) continue;
+              const key = `${Math.round(dx / 3)},${Math.round(dy / 3)}`;
+              const entry = transVotes.get(key) || { count: 0, sumDx: 0, sumDy: 0 };
+              entry.count++;
+              entry.sumDx += dx;
+              entry.sumDy += dy;
+              transVotes.set(key, entry);
+            }
+          }
+
+          const hypotheses = [];
+          const sortedTrans = [...transVotes.values()].sort((a, b) => b.count - a.count);
+          for (let i = 0; i < Math.min(4, sortedTrans.length); i++) {
+            const v = sortedTrans[i];
+            hypotheses.push({ dx: v.sumDx / v.count, dy: v.sumDy / v.count, theta: 0 });
+          }
+
+          const top1 = starsE1.slice(0, 36);
+          const top2 = starsE2.slice(0, 36);
+          const segs1 = [];
+          const segs2 = [];
+
+          for (let i = 0; i < top1.length; i++) {
+            for (let j = i + 1; j < top1.length; j++) {
+              const len = Math.hypot(top1[j].x - top1[i].x, top1[j].y - top1[i].y);
+              if (len >= 24) {
+                segs1.push({ i, j, len, ang: Math.atan2(top1[j].y - top1[i].y, top1[j].x - top1[i].x) });
+              }
+            }
+          }
+          for (let i = 0; i < top2.length; i++) {
+            for (let j = i + 1; j < top2.length; j++) {
+              const len = Math.hypot(top2[j].x - top2[i].x, top2[j].y - top2[i].y);
+              if (len >= 24) {
+                segs2.push({ i, j, len, ang: Math.atan2(top2[j].y - top2[i].y, top2[j].x - top2[i].x) });
+              }
+            }
+          }
+
+          segs1.sort((a, b) => a.len - b.len);
+          segs2.sort((a, b) => a.len - b.len);
+
+          const rotVotes = new Map();
+          let ptrStart = 0;
+
+          for (const s2 of segs2) {
+            while (ptrStart < segs1.length && segs1[ptrStart].len < s2.len - 2.8) {
+              ptrStart++;
+            }
+            for (let k = ptrStart; k < segs1.length && segs1[k].len <= s2.len + 2.8; k++) {
+              const s1 = segs1[k];
+              for (const dir of [0, 1]) {
+                const a1 = dir === 0 ? top1[s1.i] : top1[s1.j];
+                const a2 = top2[s2.i];
+                const th = wrapAngleRad(s1.ang + (dir === 1 ? Math.PI : 0) - s2.ang);
+                if (Math.abs(th) > (20 * Math.PI) / 180) continue;
+                const cosT = Math.cos(th);
+                const sinT = Math.sin(th);
+                const rx = a2.x - cx0;
+                const ry = a2.y - cy0;
+                const dx = a1.x - (cx0 + rx * cosT - ry * sinT);
+                const dy = a1.y - (cy0 + rx * sinT + ry * cosT);
+                if (Math.abs(dx) > width * 0.45 || Math.abs(dy) > height * 0.45) continue;
+
+                const key = `${Math.round((th * 180) / Math.PI / 0.6)},${Math.round(dx / 5)},${Math.round(dy / 5)}`;
+                const entry = rotVotes.get(key) || { count: 0, sumDx: 0, sumDy: 0, sumTh: 0 };
+                entry.count++;
+                entry.sumDx += dx;
+                entry.sumDy += dy;
+                entry.sumTh += th;
+                rotVotes.set(key, entry);
+              }
+            }
+          }
+
+          const sortedRot = [...rotVotes.values()].sort((a, b) => b.count - a.count);
+          for (let i = 0; i < Math.min(6, sortedRot.length); i++) {
+            const v = sortedRot[i];
+            hypotheses.push({
+              dx: v.sumDx / v.count,
+              dy: v.sumDy / v.count,
+              theta: v.sumTh / v.count,
+            });
+          }
+
+          let bestResult = {
+            dx: 0,
+            dy: 0,
+            dThetaRad: 0,
+            dThetaDeg: 0,
+            matchedStars: 0,
+            rmsPx: 0,
+            applied: false,
+          };
+
+          for (const hyp of hypotheses) {
+            let curDx = hyp.dx;
+            let curDy = hyp.dy;
+            let curTh = hyp.theta;
+            let inliers = [];
+
+            for (const tol of [4.8, 2.4, 1.5]) {
+              const cosT = Math.cos(curTh);
+              const sinT = Math.sin(curTh);
+              inliers = [];
+              const usedE1 = new Set();
+
+              for (const s2 of starsE2) {
+                const rx = s2.x - cx0;
+                const ry = s2.y - cy0;
+                const px = cx0 + rx * cosT - ry * sinT + curDx;
+                const py = cy0 + rx * sinT + ry * cosT + curDy;
+                let bestIdx = -1;
+                let bestDist = tol;
+
+                for (let idx1 = 0; idx1 < starsE1.length; idx1++) {
+                  if (usedE1.has(idx1)) continue;
+                  const d = Math.hypot(starsE1[idx1].x - px, starsE1[idx1].y - py);
+                  if (d < bestDist) {
+                    bestDist = d;
+                    bestIdx = idx1;
+                  }
+                }
+                if (bestIdx >= 0) {
+                  usedE1.add(bestIdx);
+                  inliers.push({ x1: starsE1[bestIdx].x, y1: starsE1[bestIdx].y, x2: s2.x, y2: s2.y });
+                }
+              }
+
+              if (inliers.length >= 3) {
+                const solved = solveRigidLeastSquares(inliers, cx0, cy0);
+                curDx = solved.dx;
+                curDy = solved.dy;
+                curTh = solved.dThetaRad;
+              }
+            }
+
+            if (inliers.length >= 3) {
+              const finalSolved = solveRigidLeastSquares(inliers, cx0, cy0);
+              if (
+                inliers.length > bestResult.matchedStars ||
+                (inliers.length === bestResult.matchedStars && finalSolved.rmsPx < bestResult.rmsPx)
+              ) {
+                bestResult = {
+                  dx: finalSolved.dx,
+                  dy: finalSolved.dy,
+                  dThetaRad: finalSolved.dThetaRad,
+                  dThetaDeg: (finalSolved.dThetaRad * 180) / Math.PI,
+                  matchedStars: inliers.length,
+                  rmsPx: finalSolved.rmsPx,
+                  applied: true,
+                };
+              }
+            }
+          }
+
+          return bestResult;
+        }
+
+        function cubicWeights(t) {
+          const t2 = t * t;
+          const t3 = t2 * t;
+          return [
+            -0.5 * t + t2 - 0.5 * t3,
+            1.0 - 2.5 * t2 + 1.5 * t3,
+            0.5 * t + 2.0 * t2 - 1.5 * t3,
+            -0.5 * t2 + 0.5 * t3,
+          ];
+        }
+
+        function resampleAlignedImage(rgbaE1, width, height, alignment) {
+          if (
+            !alignment.applied ||
+            (Math.abs(alignment.dx) < 0.05 &&
+              Math.abs(alignment.dy) < 0.05 &&
+              Math.abs(alignment.dThetaRad) < 0.0002)
+          ) {
+            return new Uint8ClampedArray(rgbaE1);
+          }
+
+          const out = new Uint8ClampedArray(width * height * 4);
+          const cx0 = width / 2;
+          const cy0 = height / 2;
+          const cosT = Math.cos(alignment.dThetaRad);
+          const sinT = Math.sin(alignment.dThetaRad);
+
+          for (let y2 = 0; y2 < height; y2++) {
+            const ry = y2 - cy0;
+            for (let x2 = 0; x2 < width; x2++) {
+              const rx = x2 - cx0;
+              const x1 = cx0 + rx * cosT - ry * sinT + alignment.dx;
+              const y1 = cy0 + rx * sinT + ry * cosT + alignment.dy;
+              const dstIdx = (y2 * width + x2) * 4;
+
+              if (x1 < 2 || x1 >= width - 3 || y1 < 2 || y1 >= height - 3) {
+                out[dstIdx] = 4;
+                out[dstIdx + 1] = 7;
+                out[dstIdx + 2] = 14;
+                out[dstIdx + 3] = 0;
+                continue;
+              }
+
+              const ix = Math.floor(x1);
+              const iy = Math.floor(y1);
+              const wx = cubicWeights(x1 - ix);
+              const wy = cubicWeights(y1 - iy);
+
+              let r = 0;
+              let g = 0;
+              let b = 0;
+              let valid = true;
+
+              for (let m = -1; m <= 2; m++) {
+                const wyM = wy[m + 1];
+                const rowBase = (iy + m) * width;
+                for (let n = -1; n <= 2; n++) {
+                  const idx = (rowBase + (ix + n)) * 4;
+                  if (rgbaE1[idx + 3] === 0) {
+                    valid = false;
+                    break;
+                  }
+                  const w = wx[n + 1] * wyM;
+                  r += rgbaE1[idx] * w;
+                  g += rgbaE1[idx + 1] * w;
+                  b += rgbaE1[idx + 2] * w;
+                }
+                if (!valid) break;
+              }
+
+              if (!valid) {
+                out[dstIdx + 3] = 0;
+                continue;
+              }
+
+              out[dstIdx] = Math.max(0, Math.min(255, Math.round(r)));
+              out[dstIdx + 1] = Math.max(0, Math.min(255, Math.round(g)));
+              out[dstIdx + 2] = Math.max(0, Math.min(255, Math.round(b)));
+              out[dstIdx + 3] = 255;
+            }
+          }
+
+          return out;
+        }
+
+        function subtractAlignedFramesSigma(alignedE1, epoch2, width, height, sigmaMultiplier, mode, matchBg) {
+          const totalPixels = width * height;
+          const alignedLum = new Float32Array(totalPixels);
+          const epoch2Lum = new Float32Array(totalPixels);
+          const rawValid = new Uint8Array(totalPixels);
+          const l1Samples = [];
+          const l2Samples = [];
+          let anyInvalid = false;
+
+          for (let p = 0; p < totalPixels; p++) {
+            const idx = p * 4;
+            if (alignedE1[idx + 3] === 0 || epoch2[idx + 3] === 0) {
+              rawValid[p] = 0;
+              anyInvalid = true;
+              continue;
+            }
+            rawValid[p] = 1;
+            const l1 = 0.299 * alignedE1[idx] + 0.587 * alignedE1[idx + 1] + 0.114 * alignedE1[idx + 2];
+            const l2 = 0.299 * epoch2[idx] + 0.587 * epoch2[idx + 1] + 0.114 * epoch2[idx + 2];
+            alignedLum[p] = l1;
+            epoch2Lum[p] = l2;
+            if (p % 13 === 0) {
+              l1Samples.push(l1);
+              l2Samples.push(l2);
+            }
+          }
+
+          // Erode validMask by 10 px near invalid warped/border seams to eliminate JPEG edge-block ringing
+          const validMask = new Uint8Array(totalPixels);
+          const guardR = anyInvalid ? 10 : 4;
+          for (let y = 0; y < height; y++) {
+            const rowOff = y * width;
+            if (y < guardR || y >= height - guardR) continue;
+            for (let x = guardR; x < width - guardR; x++) {
+              const p = rowOff + x;
+              if (!rawValid[p]) continue;
+              if (anyInvalid) {
+                if (
+                  !rawValid[p - 10] || !rawValid[p + 10] ||
+                  !rawValid[(y - 10) * width + x] || !rawValid[(y + 10) * width + x] ||
+                  !rawValid[p - 5] || !rawValid[p + 5] ||
+                  !rawValid[(y - 5) * width + x] || !rawValid[(y + 5) * width + x] ||
+                  !rawValid[(y - 7) * width + (x - 7)] || !rawValid[(y - 7) * width + (x + 7)] ||
+                  !rawValid[(y + 7) * width + (x - 7)] || !rawValid[(y + 7) * width + (x + 7)]
+                ) {
+                  continue;
+                }
+              }
+              validMask[p] = 1;
+            }
+          }
+
+          // Robust photometric scale (gain) matching via upper/lower quantiles of valid samples
+          let gain = 1.0;
+          if (matchBg && l1Samples.length > 64) {
+            const s1 = [...l1Samples].sort((a, b) => a - b);
+            const s2 = [...l2Samples].sort((a, b) => a - b);
+            const pLow1 = s1[Math.floor(s1.length * 0.2)];
+            const pHigh1 = s1[Math.floor(s1.length * 0.88)];
+            const pLow2 = s2[Math.floor(s2.length * 0.2)];
+            const pHigh2 = s2[Math.floor(s2.length * 0.88)];
+            if (pHigh1 - pLow1 > 10 && pHigh2 - pLow2 > 10) {
+              const est = (pHigh2 - pLow2) / (pHigh1 - pLow1);
+              gain = Math.max(0.65, Math.min(1.55, est));
+            }
+          }
+
+          const rawSignedDiff = new Float32Array(totalPixels);
+          const diffSamples = [];
+          for (let p = 0; p < totalPixels; p++) {
+            if (!validMask[p]) continue;
+            const d = epoch2Lum[p] - gain * alignedLum[p];
+            rawSignedDiff[p] = d;
+            if (p % 11 === 0) diffSamples.push(d);
+          }
+
+          diffSamples.sort((a, b) => a - b);
+          const medianDiff = diffSamples.length > 0 ? diffSamples[Math.floor(diffSamples.length / 2)] : 0;
+          const absDevs = diffSamples.map((v) => Math.abs(v - medianDiff)).sort((a, b) => a - b);
+          const mad = absDevs.length > 0 ? absDevs[Math.floor(absDevs.length / 2)] : 1;
+          const skySigma = Math.max(2.0, 1.4826 * mad);
+          const thresholdDn = sigmaMultiplier * skySigma;
+          const pedestal = matchBg ? medianDiff : 0;
+
+          if (matchBg && (Math.abs(gain - 1.0) > 1e-4 || Math.abs(pedestal) > 1e-4)) {
+            for (let p = 0; p < totalPixels; p++) {
+              if (validMask[p]) {
+                alignedLum[p] = Math.max(0, Math.min(255, gain * alignedLum[p] + pedestal));
+              }
+            }
+          }
+
+          const out = new Uint8ClampedArray(totalPixels * 4);
+          const posMap = new Float32Array(totalPixels);
+          const negMap = new Float32Array(totalPixels);
+          let activeSignalPixels = 0;
+
+          for (let p = 0; p < totalPixels; p++) {
+            const idx = p * 4;
+            if (!validMask[p]) {
+              out[idx] = 4;
+              out[idx + 1] = 5;
+              out[idx + 2] = 7;
+              out[idx + 3] = 255;
+              continue;
+            }
+
+            const centered = rawSignedDiff[p] - pedestal;
+            if (centered > thresholdDn) {
+              const excess = centered - thresholdDn;
+              posMap[p] = excess;
+              activeSignalPixels++;
+              const boost = Math.min(255, Math.round(excess * 2.8));
+              out[idx] = Math.min(255, Math.round(boost * 0.24));
+              out[idx + 1] = Math.min(255, Math.round(boost * 0.94));
+              out[idx + 2] = Math.min(255, Math.round(boost * 0.84));
+              out[idx + 3] = 255;
+            } else if (-centered > thresholdDn) {
+              const excess = -centered - thresholdDn;
+              negMap[p] = excess;
+              if (mode === 'abs') {
+                activeSignalPixels++;
+                const boost = Math.min(255, Math.round(excess * 2.4));
+                out[idx] = boost;
+                out[idx + 1] = Math.round(boost * 0.58);
+                out[idx + 2] = Math.round(boost * 0.24);
+                out[idx + 3] = 255;
+              } else {
+                out[idx] = 4;
+                out[idx + 1] = 5;
+                out[idx + 2] = 7;
+                out[idx + 3] = 255;
+              }
+            } else {
+              out[idx] = 4;
+              out[idx + 1] = 5;
+              out[idx + 2] = 7;
+              out[idx + 3] = 255;
+            }
+          }
+
+          return { out, posSignalMap: posMap, negSignalMap: negMap, alignedLum, epoch2Lum, skySigma, thresholdDn, activeSignalPixels };
+        }
+
+        function runPixelSubtraction() {
+          stopScanAnimation();
+          const sigmaMultiplier = Number(noiseSlider.value) || 5.0;
+          const mode = subtractionModeSelect.value === 'signed' ? 'signed' : 'abs';
+          const matchBg = matchBgToggle.checked;
+          const autoAlign = autoAlignToggle.checked;
+
+          const img1 = epoch1Ctx.getImageData(0, 0, frameWidth, frameHeight);
+          const img2 = epoch2Ctx.getImageData(0, 0, frameWidth, frameHeight);
+
+          let alignedData = new Uint8ClampedArray(img1.data);
+          let alignStats = {
+            dx: 0,
+            dy: 0,
+            dThetaRad: 0,
+            dThetaDeg: 0,
+            matchedStars: 0,
+            rmsPx: 0,
+            applied: false,
+          };
+
+          if (autoAlign) {
+            const stars1 = extractReferenceStars(img1.data, frameWidth, frameHeight, 56);
+            const stars2 = extractReferenceStars(img2.data, frameWidth, frameHeight, 56);
+            alignStats = solveStarMatchedTransform(stars1, stars2, frameWidth, frameHeight);
+            if (alignStats.applied) {
+              alignedData = resampleAlignedImage(img1.data, frameWidth, frameHeight, alignStats);
+            }
+          }
+
+          lastAlignment = alignStats;
+          alignedEpoch1Ctx.putImageData(new ImageData(alignedData, frameWidth, frameHeight), 0, 0);
+
+          const diff = subtractAlignedFramesSigma(
+            alignedData,
+            img2.data,
+            frameWidth,
+            frameHeight,
+            sigmaMultiplier,
+            mode,
+            matchBg
+          );
+
+          posSignalMap = diff.posSignalMap;
+          negSignalMap = diff.negSignalMap;
+          lastAlignedLum = diff.alignedLum;
+          lastEpoch2Lum = diff.epoch2Lum;
+          lastSkySigma = diff.skySigma;
+          lastThresholdDn = diff.thresholdDn;
+          lastSigmaMultiplier = sigmaMultiplier;
+
+          cleanSubtractedImageData = new ImageData(diff.out, frameWidth, frameHeight);
+          hasSubtracted = true;
+          allDetections = [];
+          selectedDetectionIdx = 0;
+          tileResults = createInitialTileStates();
+
+          renderTileMatrixStrip();
+          renderTileTable();
+          renderUnifiedCatalogTable();
+          resetFocusedSourceReadout();
+          clearPsfInspector();
+
+          if (alignStats.applied) {
+            regStatusText.textContent = `${alignStats.matchedStars} stars · ΔX ${alignStats.dx >= 0 ? '+' : ''}${alignStats.dx.toFixed(2)}, ΔY ${alignStats.dy >= 0 ? '+' : ''}${alignStats.dy.toFixed(2)} px · Δθ ${alignStats.dThetaDeg >= 0 ? '+' : ''}${alignStats.dThetaDeg.toFixed(3)}° · RMS ${alignStats.rmsPx.toFixed(2)} px`;
+          } else {
+            regStatusText.textContent = autoAlign
+              ? 'Identity fallback (<3 star pairs)'
+              : 'Disabled (Direct Pixel Mode)';
+          }
+
+          skySigmaText.textContent = `MAD σ = ${lastSkySigma.toFixed(2)} DN (Cut ${lastThresholdDn.toFixed(1)} DN)`;
+          subtractMeta.textContent = `${diff.activeSignalPixels.toLocaleString()} px > ${sigmaMultiplier.toFixed(1)}σ`;
+          pipelineStatusText.textContent = `Subtracted (${diff.activeSignalPixels.toLocaleString()} px > ${sigmaMultiplier.toFixed(1)}σ). Ready for 10-zone scan.`;
+          redrawSubtractCanvas(0);
+          if (blinkTimerId !== null) drawBlinkFrame();
+        }
+
+        function scanZoneForAllSources(sMap, zone, skySigma, sigmaMultiplier) {
+          const peaks = [];
+          const effMinPeak = Math.max(4, skySigma * 0.55);
+
+          for (let y = zone.y0 + 1; y < zone.y1 - 1; y++) {
+            const row = y * frameWidth;
+            for (let x = zone.x0 + 1; x < zone.x1 - 1; x++) {
+              const val = sMap[row + x];
+              if (val < effMinPeak) continue;
+              if (
+                val >= sMap[row + x - 1] &&
+                val >= sMap[row + x + 1] &&
+                val >= sMap[(y - 1) * frameWidth + x] &&
+                val >= sMap[(y + 1) * frameWidth + x] &&
+                val >= sMap[(y - 1) * frameWidth + x - 1] &&
+                val >= sMap[(y - 1) * frameWidth + x + 1] &&
+                val >= sMap[(y + 1) * frameWidth + x - 1] &&
+                val >= sMap[(y + 1) * frameWidth + x + 1]
+              ) {
+                peaks.push({ x, y, val });
+              }
+            }
+          }
+
+          peaks.sort((a, b) => b.val - a.val);
+          const candidates = [];
+          const used = [];
+          const radius = 8;
+
+          for (const pk of peaks) {
+            if (used.some((u) => Math.hypot(u.x - pk.x, u.y - pk.y) < 14)) continue;
+            if (lastAlignedLum && lastEpoch2Lum) {
+              let maxL1 = 0;
+              let maxL2 = 0;
+              for (let dy = -2; dy <= 2; dy++) {
+                const yy = pk.y + dy;
+                if (yy < zone.y0 || yy >= zone.y1) continue;
+                const rowOff = yy * frameWidth;
+                for (let dx = -2; dx <= 2; dx++) {
+                  const xx = pk.x + dx;
+                  if (xx < zone.x0 || xx >= zone.x1) continue;
+                  const v1 = lastAlignedLum[rowOff + xx];
+                  const v2 = lastEpoch2Lum[rowOff + xx];
+                  if (v1 > maxL1) maxL1 = v1;
+                  if (v2 > maxL2) maxL2 = v2;
+                }
+              }
+              const sharedStarBase = Math.min(maxL1, maxL2);
+              if (sharedStarBase > 46 && pk.val < 0.38 * sharedStarBase) {
+                continue;
+              }
+              if (sharedStarBase >= 245 && pk.val < 0.55 * sharedStarBase) {
+                continue;
+              }
+            }
+
+            let wSum = 0;
+            let wx = 0;
+            let wy = 0;
+            let activePixels = 0;
+
+            const yStart = Math.max(zone.y0, pk.y - radius);
+            const yEnd = Math.min(zone.y1 - 1, pk.y + radius);
+            const xStart = Math.max(zone.x0, pk.x - radius);
+            const xEnd = Math.min(zone.x1 - 1, pk.x + radius);
+
+            for (let y = yStart; y <= yEnd; y++) {
+              const rowOffset = y * frameWidth;
+              for (let x = xStart; x <= xEnd; x++) {
+                const val = sMap[rowOffset + x];
+                if (val > 0) {
+                  wSum += val;
+                  wx += x * val;
+                  wy += y * val;
+                  activePixels++;
+                }
+              }
+            }
+
+            if (wSum <= 0 || activePixels < 4) continue;
+            const cx = wx / wSum;
+            const cy = wy / wSum;
+
+            let mxx = 0;
+            let myy = 0;
+            for (let y = yStart; y <= yEnd; y++) {
+              const rowOffset = y * frameWidth;
+              for (let x = xStart; x <= xEnd; x++) {
+                const val = sMap[rowOffset + x];
+                if (val > 0) {
+                  const dx = x - cx;
+                  const dy = y - cy;
+                  mxx += val * dx * dx;
+                  myy += val * dy * dy;
+                }
+              }
+            }
+
+            const sigmaSq = Math.max(0.25, (mxx + myy) / (2 * wSum));
+            const fwhmPx = 2.3548 * Math.sqrt(sigmaSq);
+            const snr = sigmaMultiplier + pk.val / Math.max(0.5, skySigma);
+            const confidence = Math.min(99.9, Math.max(60.0, 58 + Math.min(41.9, snr * 3.0)));
+
+            const nearLeft = zone.col > 0 && cx < zone.baseX0 + halfOverlap;
+            const nearRight = zone.col < GRID_COLS - 1 && cx >= zone.baseX1 - halfOverlap;
+            const nearTop = zone.row > 0 && cy < zone.baseY0 + halfOverlap;
+            const nearBottom = zone.row < GRID_ROWS - 1 && cy >= zone.baseY1 - halfOverlap;
+
+            used.push({ x: cx, y: cy });
+            candidates.push({
+              zoneId: zone.id,
+              cx,
+              cy,
+              peak: pk.val,
+              flux: wSum,
+              fwhmPx,
+              pixelCount: activePixels,
+              snr,
+              confidence,
+              inOverlap: nearLeft || nearRight || nearTop || nearBottom,
+            });
+
+            if (candidates.length >= 10) break;
+          }
+
+          return candidates;
+        }
+
+        function mergeDetectionsWithDipolePairing(posCandidates, negCandidates) {
+          const maxDipoleDistPx = Math.max(240, Math.round(0.35 * Math.hypot(frameWidth, frameHeight)));
+
+          function clusterList(cands) {
+            const sorted = [...cands].sort((a, b) => b.flux - a.flux);
+            const clusters = [];
+            for (const c of sorted) {
+              let hit = null;
+              for (const cl of clusters) {
+                if (Math.hypot(c.cx - cl[0].cx, c.cy - cl[0].cy) <= 18) {
+                  hit = cl;
+                  break;
+                }
+              }
+              if (hit) hit.push(c);
+              else clusters.push([c]);
+            }
+            return clusters;
+          }
+
+          const posClusters = clusterList(posCandidates);
+          const negCentroids = clusterList(negCandidates).map((cl) => {
+            const tot = cl.reduce((s, c) => s + c.flux, 0);
+            return {
+              cx: cl.reduce((s, c) => s + c.cx * c.flux, 0) / tot,
+              cy: cl.reduce((s, c) => s + c.cy * c.flux, 0) / tot,
+              flux: cl[0].flux,
+              used: false,
+            };
+          });
+
+          const merged = posClusters.map((cluster) => {
+            const totalFlux = cluster.reduce((acc, c) => acc + c.flux, 0);
+            const cx = cluster.reduce((acc, c) => acc + c.cx * c.flux, 0) / totalFlux;
+            const cy = cluster.reduce((acc, c) => acc + c.cy * c.flux, 0) / totalFlux;
+            const zoneIds = [...new Set(cluster.map((c) => c.zoneId))].sort((a, b) => a - b);
+            const primary = cluster[0];
+            const isOverlapConfirmed = zoneIds.length >= 2;
+            const maxConf = Math.max(...cluster.map((c) => c.confidence));
+
+            let bestHoleIdx = -1;
+            let bestDist = maxDipoleDistPx;
+            negCentroids.forEach((h, hIdx) => {
+              if (h.used) return;
+              const d = Math.hypot(cx - h.cx, cy - h.cy);
+              if (d < 4 || d > maxDipoleDistPx) return;
+              const ratio = h.flux / Math.max(1, primary.flux);
+              if (ratio < 0.25 || ratio > 4.0) return;
+              if (d < bestDist) {
+                bestDist = d;
+                bestHoleIdx = hIdx;
+              }
+            });
+
+            let classification = 'New Source (+5σ)';
+            let motionPx = null;
+            let motionPaDeg = null;
+            let e1HoleX = null;
+            let e1HoleY = null;
+
+            if (bestHoleIdx >= 0) {
+              const hole = negCentroids[bestHoleIdx];
+              hole.used = true;
+              classification = 'Moving Body (Dipole)';
+              motionPx = bestDist;
+              const pa = (Math.atan2(-(cx - hole.cx), -(cy - hole.cy)) * 180) / Math.PI;
+              motionPaDeg = (pa + 360) % 360;
+              e1HoleX = hole.cx;
+              e1HoleY = hole.cy;
+            }
+
+            return {
+              id: 0,
+              cx,
+              cy,
+              peak: primary.peak,
+              flux: primary.flux,
+              fwhmPx: primary.fwhmPx,
+              snr: primary.snr,
+              confidence: isOverlapConfirmed ? Math.min(99.9, maxConf + 1.2) : maxConf,
+              zoneIds,
+              isOverlapConfirmed,
+              overlapPairLabel: isOverlapConfirmed
+                ? `OL #${zoneIds.join(',#')}`
+                : `Zone #${zoneIds[0]}`,
+              classification,
+              motionPx,
+              motionPaDeg,
+              e1HoleX,
+              e1HoleY,
+            };
+          });
+
+          merged.sort((a, b) => b.flux - a.flux || a.cy - b.cy || a.cx - b.cx);
+          merged.forEach((m, i) => {
+            m.id = i + 1;
+          });
+          return merged;
+        }
+
+        function stopScanAnimation() {
+          if (scanAnimId !== null) {
+            cancelAnimationFrame(scanAnimId);
+            scanAnimId = null;
+          }
+          isScanning = false;
+        }
+
+        function runTenTileExtraction() {
+          if (!hasSubtracted || !posSignalMap) {
+            runPixelSubtraction();
+          }
+          stopScanAnimation();
+          isScanning = true;
+          allDetections = [];
+          selectedDetectionIdx = 0;
+          renderUnifiedCatalogTable();
+          resetFocusedSourceReadout();
+          clearPsfInspector();
+
+          const perTilePos = zones.map((z) =>
+            scanZoneForAllSources(posSignalMap, z, lastSkySigma, lastSigmaMultiplier)
+          );
+          const perTileNeg = zones.map((z) =>
+            scanZoneForAllSources(negSignalMap, z, lastSkySigma, lastSigmaMultiplier)
+          );
+          const mergedList = mergeDetectionsWithDipolePairing(
+            perTilePos.flat(),
+            perTileNeg.flat()
+          );
+
+          const durationMs = 760;
+          const startTime = performance.now();
+          pipelineStatusText.textContent = 'Scanning 5×2 zone array...';
+
+          function step(now) {
+            const progress = Math.min(1, (now - startTime) / durationMs);
+
+            tileResults = zones.map((z, idx) => {
+              const cands = perTilePos[idx];
+              const topCand = cands[0] || null;
+              const scanned = Math.round(z.pixelCount * progress);
+              if (progress < 1) {
+                return {
+                  zone: z,
+                  scannedPixels: scanned,
+                  overlapStatus: progress > 0.45 ? `${activeOverlapPx}px Border Check` : 'Scanning',
+                  confidence: topCand && progress > 0.7 ? topCand.confidence : null,
+                  status: 'Scanning',
+                  candidates: cands,
+                };
+              }
+
+              const matchedOverlap = mergedList.some(
+                (m) => m.isOverlapConfirmed && m.zoneIds.includes(z.id)
+              );
+              const matchedCore = mergedList.some(
+                (m) => !m.isOverlapConfirmed && m.zoneIds.includes(z.id)
+              );
+
+              let overlapStatus = 'Border Clear';
+              if (matchedOverlap) overlapStatus = `${activeOverlapPx}px Overlap`;
+              else if (matchedCore) overlapStatus = 'Core Match';
+
+              return {
+                zone: z,
+                scannedPixels: z.pixelCount,
+                overlapStatus,
+                confidence: topCand ? topCand.confidence : 0,
+                status: cands.length > 0 ? 'Detected' : 'Clear',
+                candidates: cands,
+              };
+            });
+
+            renderTileMatrixStrip();
+            renderTileTable();
+            scanSummaryMeta.textContent =
+              progress < 1 ? `${Math.round(progress * 100)}% Scanning` : '10 / 10 Complete';
+
+            if (progress < 1) {
+              redrawSubtractCanvas(progress);
+              scanAnimId = requestAnimationFrame(step);
+            } else {
+              isScanning = false;
+              scanAnimId = null;
+              finalizeScanOutput(mergedList);
+            }
+          }
+
+          scanAnimId = requestAnimationFrame(step);
+        }
+
+        function finalizeScanOutput(mergedList) {
+          allDetections = mergedList;
+          selectedDetectionIdx = 0;
+          renderUnifiedCatalogTable();
+
+          if (allDetections.length === 0) {
+            redrawSubtractCanvas(0);
+            clearPsfInspector();
+            outRa.textContent = 'None';
+            outDec.textContent = 'None';
+            outPixel.textContent = 'None > ' + lastSigmaMultiplier.toFixed(1) + 'σ';
+            outMotion.textContent = '--';
+            outZones.textContent = '0 Zones';
+            outSnr.textContent = '0.0 σ / -- px / 0.0 %';
+            overlapBanner.className = 'overlap-banner';
+            overlapBanner.textContent =
+              'No source exceeded the sigma cutoff. Lower Sigma Cutoff or check Auto-Align.';
+            pipelineStatusText.textContent =
+              `Scan complete: 0 sources > ${lastSigmaMultiplier.toFixed(1)}σ.`;
+            return;
+          }
+
+          updateFocusedSourceReadout();
+          redrawSubtractCanvas(0);
+        }
+
+        function renderUnifiedCatalogTable() {
+          catalogCountMeta.textContent = `${allDetections.length} ${allDetections.length === 1 ? 'Source' : 'Sources'}`;
+          catalogTableBody.innerHTML = '';
+
+          if (allDetections.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+              <td colspan="9" class="empty-table-cell">
+                Run <strong>Align &amp; Subtract</strong> then <strong>Run 10-Zone Scan</strong>.
+              </td>
+            `;
+            catalogTableBody.appendChild(tr);
+            return;
+          }
+
+          allDetections.forEach((det, idx) => {
+            const wcs = pixelToWcsRaDec(
+              det.cx,
+              det.cy,
+              activeContext.centerRaDeg,
+              activeContext.centerDecDeg,
+              activeContext.plateScaleArcsec
+            );
+            const motionStr =
+              det.motionPx !== null
+                ? `${det.motionPx.toFixed(1)}px · ${(det.motionPx * activeContext.plateScaleArcsec).toFixed(1)}" (${Math.round(det.motionPaDeg)}°)`
+                : 'Single-Epoch';
+
+            const tr = document.createElement('tr');
+            tr.className = 'catalog-row' + (idx === selectedDetectionIdx ? ' is-selected' : '');
+            tr.setAttribute('tabindex', '0');
+            tr.setAttribute('aria-label', `Select Source #${det.id} at ${wcs.raFormatted} ${wcs.decFormatted}`);
+            tr.innerHTML = `
+              <td class="tabular-nums"><strong>#${det.id}</strong></td>
+              <td class="${det.classification.includes('Dipole') ? 'class-dipole' : 'class-new'}">${det.classification.includes('Dipole') ? 'Dipole' : 'New (+5σ)'}</td>
+              <td class="tabular-nums">${wcs.raFormatted}</td>
+              <td class="tabular-nums">${wcs.decFormatted}</td>
+              <td class="tabular-nums">${det.cx.toFixed(1)}, ${det.cy.toFixed(1)}</td>
+              <td class="tabular-nums">${motionStr}</td>
+              <td class="tabular-nums">${det.snr.toFixed(1)}&sigma;</td>
+              <td class="tabular-nums">${det.fwhmPx.toFixed(2)} px</td>
+              <td class="tabular-nums">${det.overlapPairLabel}</td>
+            `;
+            const selectRow = function () {
+              selectedDetectionIdx = idx;
+              renderUnifiedCatalogTable();
+              updateFocusedSourceReadout();
+              redrawSubtractCanvas(0);
+            };
+            tr.addEventListener('click', selectRow);
+            tr.addEventListener('keydown', function (e) {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectRow();
+              }
+            });
+            catalogTableBody.appendChild(tr);
+          });
+        }
+
+        function updateFocusedSourceReadout() {
+          const det = allDetections[selectedDetectionIdx];
+          if (!det) return;
+
+          const wcs = pixelToWcsRaDec(
+            det.cx,
+            det.cy,
+            activeContext.centerRaDeg,
+            activeContext.centerDecDeg,
+            activeContext.plateScaleArcsec
+          );
+
+          outRa.textContent = wcs.raFormatted;
+          outDec.textContent = wcs.decFormatted;
+          outPixel.textContent = `${det.cx.toFixed(1)}, ${det.cy.toFixed(1)} px`;
+          outMotion.textContent =
+            det.motionPx !== null
+              ? `${det.motionPx.toFixed(1)} px (${(det.motionPx * activeContext.plateScaleArcsec).toFixed(1)}") / ${Math.round(det.motionPaDeg)}°`
+              : 'Single-Epoch Excess';
+          outZones.textContent = det.zoneIds.map((id) => `Zone #${id}`).join(' & ');
+          outSnr.textContent = `${det.snr.toFixed(1)}σ / ${det.fwhmPx.toFixed(2)} px / ${det.confidence.toFixed(1)}%`;
+
+          renderPsfInspector(det);
+
+          const multiPrefix =
+            allDetections.length > 1
+              ? `#${det.id} of ${allDetections.length} sources · `
+              : '';
+
+          if (det.isOverlapConfirmed) {
+            overlapBanner.className = 'overlap-banner is-confirmed';
+            overlapBanner.textContent = `${multiPrefix}${activeOverlapPx}px overlap match verified by ${det.zoneIds.map((id) => 'Zone #' + id).join(' & ')} (${det.classification}).`;
+            pipelineStatusText.textContent = `Detected ${allDetections.length} ${allDetections.length === 1 ? 'source' : 'sources'} > ${lastSigmaMultiplier.toFixed(1)}σ. Selected #${det.id}: ${wcs.raFormatted}, ${wcs.decFormatted}.`;
+          } else {
+            overlapBanner.className = 'overlap-banner is-single';
+            overlapBanner.textContent = `${multiPrefix}Detected in Zone #${det.zoneIds[0]} (${det.classification}).`;
+            pipelineStatusText.textContent = `Detected ${allDetections.length} ${allDetections.length === 1 ? 'source' : 'sources'} > ${lastSigmaMultiplier.toFixed(1)}σ. Selected #${det.id}: ${wcs.raFormatted}, ${wcs.decFormatted}.`;
+          }
+        }
+
+        function resetFocusedSourceReadout() {
+          outRa.textContent = '--h --m --.-s';
+          outDec.textContent = '--° --\' --"';
+          outPixel.textContent = '-- , -- px';
+          outMotion.textContent = '--';
+          outZones.textContent = 'Pending';
+          outSnr.textContent = '-- σ / -- px / -- %';
+          overlapBanner.className = 'overlap-banner';
+          overlapBanner.textContent =
+            'Run Align & Subtract then Run 10-Zone Scan to measure moving sources.';
+          scanSummaryMeta.textContent = '0 / 10 Complete';
+        }
+
+        function redrawSubtractCanvas(sweepProgress) {
+          if (cleanSubtractedImageData) {
+            subtractCtx.putImageData(cleanSubtractedImageData, 0, 0);
+          } else {
+            subtractCtx.fillStyle = '#040507';
+            subtractCtx.fillRect(0, 0, frameWidth, frameHeight);
+            subtractCtx.fillStyle = '#6c7689';
+            subtractCtx.font = '600 16px ' + getComputedStyle(document.body).fontFamily;
+            subtractCtx.textAlign = 'center';
+            subtractCtx.fillText(
+              'Click "Align & Subtract" to compute epoch difference',
+              frameWidth / 2,
+              frameHeight / 2
+            );
+          }
+
+          if (overlapGridToggle.checked) {
+            drawTenTileOverlapGrid(subtractCtx);
+          }
+
+          if (isScanning && sweepProgress > 0 && sweepProgress <= 1) {
+            drawParallelScanSweeps(subtractCtx, sweepProgress);
+          }
+
+          if (allDetections.length > 0) {
+            allDetections.forEach((det, idx) => {
+              const isSelected = idx === selectedDetectionIdx;
+              const wcs = pixelToWcsRaDec(
+                det.cx,
+                det.cy,
+                activeContext.centerRaDeg,
+                activeContext.centerDecDeg,
+                activeContext.plateScaleArcsec
+              );
+              drawTargetCrosshair(subtractCtx, det, wcs, isSelected);
+            });
+          }
+        }
+
+        function drawTenTileOverlapGrid(ctx) {
+          const colW = frameWidth / GRID_COLS;
+          const rowH = frameHeight / GRID_ROWS;
+          const activeDet = allDetections[selectedDetectionIdx] || null;
+
+          ctx.save();
+          for (let c = 1; c < GRID_COLS; c++) {
+            const bx = c * colW;
+            ctx.fillStyle = 'rgba(251, 146, 60, 0.08)';
+            ctx.fillRect(bx - halfOverlap, 0, activeOverlapPx, frameHeight);
+
+            ctx.strokeStyle = 'rgba(251, 146, 60, 0.45)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(bx - halfOverlap, 0);
+            ctx.lineTo(bx - halfOverlap, frameHeight);
+            ctx.moveTo(bx + halfOverlap, 0);
+            ctx.lineTo(bx + halfOverlap, frameHeight);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+            ctx.strokeStyle = 'rgba(45, 212, 191, 0.35)';
+            ctx.beginPath();
+            ctx.moveTo(bx, 0);
+            ctx.lineTo(bx, frameHeight);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(253, 186, 116, 0.88)';
+            ctx.font = '600 11px ui-monospace, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${activeOverlapPx}px OVERLAP`, bx, 17);
+          }
+
+          const by = rowH;
+          ctx.fillStyle = 'rgba(251, 146, 60, 0.08)';
+          ctx.fillRect(0, by - halfOverlap, frameWidth, activeOverlapPx);
+
+          ctx.strokeStyle = 'rgba(251, 146, 60, 0.45)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, by - halfOverlap);
+          ctx.lineTo(frameWidth, by - halfOverlap);
+          ctx.moveTo(0, by + halfOverlap);
+          ctx.lineTo(frameWidth, by + halfOverlap);
+          ctx.stroke();
+
+          ctx.setLineDash([]);
+          ctx.strokeStyle = 'rgba(45, 212, 191, 0.35)';
+          ctx.beginPath();
+          ctx.moveTo(0, by);
+          ctx.lineTo(frameWidth, by);
+          ctx.stroke();
+
+          ctx.fillStyle = 'rgba(253, 186, 116, 0.88)';
+          ctx.font = '600 11px ui-monospace, monospace';
+          ctx.textAlign = 'left';
+          ctx.fillText(`${activeOverlapPx}px HORIZONTAL OVERLAP`, 12, by - 6);
+
+          for (const z of zones) {
+            const labelX = z.baseX0 + 12;
+            const labelY = z.row === 0 ? 35 : z.baseY1 - 14;
+            const isMatched = activeDet && activeDet.zoneIds.includes(z.id);
+
+            ctx.fillStyle = isMatched
+              ? 'rgba(251, 146, 60, 0.98)'
+              : 'rgba(94, 234, 212, 0.82)';
+            ctx.font = '700 12px ui-monospace, monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`Z#${z.id}`, labelX, labelY);
+
+            if (isMatched && activeDet) {
+              ctx.strokeStyle = 'rgba(251, 146, 60, 0.45)';
+              ctx.lineWidth = 1.2;
+              ctx.setLineDash([4, 4]);
+              ctx.beginPath();
+              ctx.moveTo(labelX + 36, labelY - 4);
+              ctx.lineTo(activeDet.cx, activeDet.cy);
+              ctx.stroke();
+              ctx.setLineDash([]);
+            }
+          }
+          ctx.restore();
+        }
+
+        function drawParallelScanSweeps(ctx, progress) {
+          ctx.save();
+          for (const z of zones) {
+            const zoneW = z.x1 - z.x0;
+            const zoneH = z.y1 - z.y0;
+            const sweepY = z.y0 + zoneH * progress;
+            ctx.fillStyle = 'rgba(45, 212, 191, 0.08)';
+            ctx.fillRect(z.x0, z.y0, zoneW, sweepY - z.y0);
+            ctx.strokeStyle = '#2dd4bf';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(z.x0, sweepY);
+            ctx.lineTo(z.x1, sweepY);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        function drawTargetCrosshair(ctx, detection, wcs, isSelected) {
+          const cx = detection.cx;
+          const cy = detection.cy;
+          const color = isSelected
+            ? detection.isOverlapConfirmed
+              ? '#fb923c'
+              : '#2dd4bf'
+            : 'rgba(161, 171, 188, 0.85)';
+
+          ctx.save();
+          if (detection.e1HoleX !== null && detection.e1HoleY !== null) {
+            ctx.strokeStyle = isSelected ? 'rgba(251, 146, 60, 0.82)' : 'rgba(251, 146, 60, 0.45)';
+            ctx.lineWidth = 1.3;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(detection.e1HoleX, detection.e1HoleY);
+            ctx.lineTo(cx, cy);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.beginPath();
+            ctx.arc(detection.e1HoleX, detection.e1HoleY, 7, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          ctx.strokeStyle = color;
+          ctx.lineWidth = isSelected ? 2 : 1.4;
+          ctx.beginPath();
+          ctx.arc(cx, cy, isSelected ? 24 : 15, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, isSelected ? 9 : 5, 0, Math.PI * 2);
+          ctx.stroke();
+
+          if (isSelected) {
+            const gap = 14;
+            const outer = 38;
+            ctx.beginPath();
+            ctx.moveTo(cx - outer, cy);
+            ctx.lineTo(cx - gap, cy);
+            ctx.moveTo(cx + gap, cy);
+            ctx.lineTo(cx + outer, cy);
+            ctx.moveTo(cx, cy - outer);
+            ctx.lineTo(cx, cy - gap);
+            ctx.moveTo(cx, cy + gap);
+            ctx.lineTo(cx, cy + outer);
+            ctx.stroke();
+
+            const boxW = 248;
+            const boxH = 58;
+            const placeLeft = cx + 44 + boxW > frameWidth;
+            const boxX = placeLeft ? cx - 44 - boxW : cx + 44;
+            const boxY = Math.max(10, Math.min(frameHeight - boxH - 10, cy - boxH / 2));
+
+            ctx.fillStyle = 'rgba(7, 8, 10, 0.92)';
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1.5;
+            ctx.fillRect(boxX, boxY, boxW, boxH);
+            ctx.strokeRect(boxX, boxY, boxW, boxH);
+
+            ctx.fillStyle = color;
+            ctx.font = '700 12px ui-monospace, monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(
+              `SRC #${detection.id} · Z#${detection.zoneIds.join(' & #')}`,
+              boxX + 10,
+              boxY + 18
+            );
+
+            ctx.fillStyle = '#f2f4f7';
+            ctx.font = '600 12px ui-monospace, monospace';
+            ctx.fillText(`RA  ${wcs.raFormatted}`, boxX + 10, boxY + 35);
+            ctx.fillText(`Dec ${wcs.decFormatted}`, boxX + 10, boxY + 50);
+          } else {
+            ctx.fillStyle = '#f2f4f7';
+            ctx.font = '700 11px ui-monospace, monospace';
+            ctx.fillText(`#${detection.id}`, cx + 17, cy - 8);
+          }
+          ctx.restore();
+        }
+
+        function renderPsfInspector(det) {
+          if (!det || !cleanSubtractedImageData || !posSignalMap) {
+            clearPsfInspector();
+            return;
+          }
+
+          const half = 12;
+          const cxInt = Math.round(det.cx);
+          const cyInt = Math.round(det.cy);
+          const patchData = psfCropCtx.createImageData(25, 25);
+          const src = cleanSubtractedImageData.data;
+
+          for (let py = 0; py < 25; py++) {
+            const sy = cyInt - half + py;
+            for (let px = 0; px < 25; px++) {
+              const sx = cxInt - half + px;
+              const dstIdx = (py * 25 + px) * 4;
+              if (sx >= 0 && sx < frameWidth && sy >= 0 && sy < frameHeight) {
+                const srcIdx = (sy * frameWidth + sx) * 4;
+                patchData.data[dstIdx] = src[srcIdx];
+                patchData.data[dstIdx + 1] = src[srcIdx + 1];
+                patchData.data[dstIdx + 2] = src[srcIdx + 2];
+                patchData.data[dstIdx + 3] = 255;
+              } else {
+                patchData.data[dstIdx + 3] = 255;
+              }
+            }
+          }
+          psfCropCtx.putImageData(patchData, 0, 0);
+
+          psfCropCtx.strokeStyle = 'rgba(251, 146, 60, 0.78)';
+          psfCropCtx.lineWidth = 1;
+          psfCropCtx.beginPath();
+          psfCropCtx.moveTo(12.5, 0);
+          psfCropCtx.lineTo(12.5, 7);
+          psfCropCtx.moveTo(12.5, 18);
+          psfCropCtx.lineTo(12.5, 25);
+          psfCropCtx.moveTo(0, 12.5);
+          psfCropCtx.lineTo(7, 12.5);
+          psfCropCtx.moveTo(18, 12.5);
+          psfCropCtx.lineTo(25, 12.5);
+          psfCropCtx.stroke();
+
+          const sliceHalf = 20;
+          const values = [];
+          let maxVal = 10;
+          for (let dx = -sliceHalf; dx <= sliceHalf; dx++) {
+            const sx = cxInt + dx;
+            const v =
+              sx >= 0 && sx < frameWidth && cyInt >= 0 && cyInt < frameHeight
+                ? posSignalMap[cyInt * frameWidth + sx]
+                : 0;
+            values.push(v);
+            if (v > maxVal) maxVal = v;
+          }
+
+          const pw = psfProfileCanvas.width;
+          const ph = psfProfileCanvas.height;
+          psfProfileCtx.clearRect(0, 0, pw, ph);
+          psfProfileCtx.fillStyle = '#050608';
+          psfProfileCtx.fillRect(0, 0, pw, ph);
+
+          psfProfileCtx.strokeStyle = 'rgba(108, 118, 137, 0.25)';
+          psfProfileCtx.lineWidth = 1;
+          psfProfileCtx.beginPath();
+          psfProfileCtx.moveTo(0, ph - 8);
+          psfProfileCtx.lineTo(pw, ph - 8);
+          psfProfileCtx.stroke();
+
+          psfProfileCtx.beginPath();
+          values.forEach((v, idx) => {
+            const x = (idx / (values.length - 1)) * (pw - 16) + 8;
+            const y = ph - 8 - (v / maxVal) * (ph - 18);
+            if (idx === 0) psfProfileCtx.moveTo(x, ph - 8);
+            psfProfileCtx.lineTo(x, y);
+          });
+          psfProfileCtx.lineTo(pw - 8, ph - 8);
+          psfProfileCtx.closePath();
+          psfProfileCtx.fillStyle = det.isOverlapConfirmed
+            ? 'rgba(251, 146, 60, 0.2)'
+            : 'rgba(45, 212, 191, 0.2)';
+          psfProfileCtx.fill();
+
+          psfProfileCtx.beginPath();
+          values.forEach((v, idx) => {
+            const x = (idx / (values.length - 1)) * (pw - 16) + 8;
+            const y = ph - 8 - (v / maxVal) * (ph - 18);
+            if (idx === 0) psfProfileCtx.moveTo(x, y);
+            else psfProfileCtx.lineTo(x, y);
+          });
+          psfProfileCtx.strokeStyle = det.isOverlapConfirmed ? '#fb923c' : '#2dd4bf';
+          psfProfileCtx.lineWidth = 2;
+          psfProfileCtx.stroke();
+
+          psfFluxLabel.textContent = `Flux: ${Math.round(det.flux).toLocaleString()} DN`;
+        }
+
+        function clearPsfInspector() {
+          psfCropCtx.fillStyle = '#040507';
+          psfCropCtx.fillRect(0, 0, 25, 25);
+          psfProfileCtx.fillStyle = '#050608';
+          psfProfileCtx.fillRect(0, 0, psfProfileCanvas.width, psfProfileCanvas.height);
+          psfProfileCtx.fillStyle = '#647b9e';
+          psfProfileCtx.font = '11px ui-monospace, monospace';
+          psfProfileCtx.textAlign = 'center';
+          psfProfileCtx.fillText(
+            'Awaiting extraction to sample PSF profile',
+            psfProfileCanvas.width / 2,
+            psfProfileCanvas.height / 2 + 4
+          );
+          psfFluxLabel.textContent = 'Flux: -- DN';
+        }
+
+        function renderTileMatrixStrip() {
+          tileMatrixStrip.innerHTML = '';
+          for (const item of tileResults) {
+            const tile = document.createElement('div');
+            let stateClass = '';
+            let stateLabel = 'IDLE';
+            if (item.status === 'Scanning') {
+              stateClass = 'is-scanning';
+              stateLabel = 'SCAN';
+            } else if (item.status === 'Clear') {
+              stateClass = 'is-clear';
+              stateLabel = 'CLR';
+            } else if (item.status === 'Detected') {
+              stateClass = 'is-detected';
+              stateLabel = `${item.candidates.length} SRC`;
+            }
+            tile.className = `tile-mini ${stateClass}`;
+            tile.innerHTML = `<span class="tabular-nums"><strong>Zone #${item.zone.id}</strong></span><span class="tile-state tabular-nums">${stateLabel}</span>`;
+            tileMatrixStrip.appendChild(tile);
+          }
+        }
+
+        function renderTileTable() {
+          tileTableBody.innerHTML = '';
+          for (const item of tileResults) {
+            const z = item.zone;
+            const tr = document.createElement('tr');
+            if (item.status === 'Detected') {
+              tr.className = 'row-detected';
+            }
+
+            const pct = Math.round((item.scannedPixels / z.pixelCount) * 100);
+            const confText = item.confidence === null ? '-- %' : `${item.confidence.toFixed(1)} %`;
+
+            let statusClass = 'status-idle';
+            if (item.status === 'Scanning') statusClass = 'status-scanning';
+            else if (item.status === 'Clear') statusClass = 'status-clear';
+            else if (item.status === 'Detected') statusClass = 'status-detected';
+
+            tr.innerHTML = `
+              <td class="tabular-nums"><strong>Zone #${z.id}</strong></td>
+              <td class="tabular-nums">X:${z.x0}–${z.x1}, Y:${z.y0}–${z.y1}</td>
+              <td>
+                <div class="progress-cell">
+                  <div class="progress-track"><div class="progress-fill" style="width:${pct}%"></div></div>
+                  <span class="tabular-nums">${item.scannedPixels.toLocaleString()} / ${z.pixelCount.toLocaleString()}</span>
+                </div>
+              </td>
+              <td>${item.overlapStatus}</td>
+              <td class="tabular-nums">${confText}</td>
+              <td><span class="status-text ${statusClass}">${item.status}</span></td>
+            `;
+            tileTableBody.appendChild(tr);
+          }
+        }
+
+        function loadPlateObject(plate, statusMsgPrefix) {
+          stopScanAnimation();
+          rawCustomEpochs[1] = null;
+          rawCustomEpochs[2] = null;
+          setWorkingResolution(PRESET_W, PRESET_H);
+
+          const scaleArcsec = plate.plateScaleArcsec || PLATE_SCALE_DEFAULT;
+          const lead = plate.movingBodies[0];
+          const targetRaDeg = parseRaToDeg(plate.raStr);
+          const targetDecDeg = parseDecToDeg(plate.decStr);
+          const center = computeFieldCenterForTarget(
+            targetRaDeg,
+            targetDecDeg,
+            lead.e2x,
+            lead.e2y,
+            scaleArcsec
+          );
+
+          activeContext = {
+            label: plate.name,
+            centerRaDeg: center.centerRaDeg,
+            centerDecDeg: center.centerDecDeg,
+            plateScaleArcsec: scaleArcsec,
+            isCustomUpload: false,
+          };
+          syncWcsInputsFromContext();
+
+          renderAstrometricPlate(plate);
+          epoch1Tag.textContent = plate.e1EpochTag || `${plate.name} · Baseline`;
+          epoch2Tag.textContent = plate.e2EpochTag || plate.bandNote;
+          wcsTargetLabel.textContent = `${plate.name} · WCS J2000`;
+
+          hasSubtracted = false;
+          cleanSubtractedImageData = null;
+          posSignalMap = null;
+          negSignalMap = null;
+          allDetections = [];
+          selectedDetectionIdx = 0;
+          lastAlignment = { dx: 0, dy: 0, dThetaRad: 0, dThetaDeg: 0, matchedStars: 0, rmsPx: 0, applied: false };
+          tileResults = createInitialTileStates();
+
+          renderTileMatrixStrip();
+          renderTileTable();
+          renderUnifiedCatalogTable();
+          resetFocusedSourceReadout();
+          clearPsfInspector();
+
+          regStatusText.textContent = 'Pending';
+          skySigmaText.textContent = 'MAD σ = -- DN';
+          subtractMeta.textContent = 'Ready';
+          pipelineStatusText.textContent = `${plate.name} loaded (${frameWidth}×${frameHeight} px, ${scaleArcsec}"/px).`;
+          redrawSubtractCanvas(0);
+          if (blinkTimerId !== null) drawBlinkFrame();
+        }
+
+        function loadNasaPreset(presetKey) {
+          const preset = NASA_PRESETS[presetKey] || NASA_PRESETS.barnard;
+          loadPlateObject(preset, 'Loaded');
+        }
+
+        function applyCustomEpochSource(epochIndex, sourceCanvas, srcW, srcH, metaEl, tagEl, labelName, fileName, fitsMeta) {
+          rawCustomEpochs[epochIndex] = { canvas: sourceCanvas, w: srcW, h: srcH };
+          const otherIdx = epochIndex === 1 ? 2 : 1;
+          const other = rawCustomEpochs[otherIdx];
+
+          let nextW = srcW;
+          let nextH = srcH;
+          if (other) {
+            nextW = Math.max(srcW, other.w);
+            nextH = Math.max(srcH, other.h);
+          }
+
+          // Resize working canvases to true native pixel dimensions (never shrink pixels)
+          if (nextW !== frameWidth || nextH !== frameHeight) {
+            // Preserve the untouched preset/other canvas pixels only if it was already custom; otherwise adopt uploaded size
+            setWorkingResolution(nextW, nextH);
+          }
+
+          if (rawCustomEpochs[1]) {
+            drawSourceNativeCentered(rawCustomEpochs[1].canvas, rawCustomEpochs[1].w, rawCustomEpochs[1].h, epoch1Ctx);
+            epoch1Meta.textContent = `${rawCustomEpochs[1].w} × ${rawCustomEpochs[1].h} px`;
+          } else {
+            epoch1Ctx.fillStyle = '#040507';
+            epoch1Ctx.fillRect(0, 0, frameWidth, frameHeight);
+            epoch1Meta.textContent = 'Awaiting Epoch 1';
+          }
+
+          if (rawCustomEpochs[2]) {
+            drawSourceNativeCentered(rawCustomEpochs[2].canvas, rawCustomEpochs[2].w, rawCustomEpochs[2].h, epoch2Ctx);
+            epoch2Meta.textContent = `${rawCustomEpochs[2].w} × ${rawCustomEpochs[2].h} px`;
+          } else {
+            epoch2Ctx.fillStyle = '#040507';
+            epoch2Ctx.fillRect(0, 0, frameWidth, frameHeight);
+            epoch2Meta.textContent = 'Awaiting Epoch 2';
+          }
+
+          if (fitsMeta) {
+            metaEl.textContent = `${srcW} × ${srcH} px (FITS)`;
+            tagEl.textContent = `${fileName.slice(0, 20)} · BITPIX ${fitsMeta.bitpix}`;
+            if (fitsMeta.crval1 !== undefined && fitsMeta.crval2 !== undefined) {
+              activeContext.centerRaDeg = fitsMeta.crval1;
+              activeContext.centerDecDeg = fitsMeta.crval2;
+            }
+            if (fitsMeta.plateScaleArcsec !== undefined) {
+              activeContext.plateScaleArcsec = fitsMeta.plateScaleArcsec;
+            }
+            activeContext.label = fitsMeta.objectName || 'Custom FITS Observation';
+            syncWcsInputsFromContext();
+          } else {
+            metaEl.textContent = `${srcW} × ${srcH} px`;
+            tagEl.textContent = `${fileName.slice(0, 22)} (Native)`;
+            const userScale = Number(wcsScaleInput.value);
+            if (Number.isFinite(userScale) && userScale > 0) {
+              activeContext.plateScaleArcsec = userScale;
+            }
+            activeContext.label = 'Custom Sky Observation';
+          }
+
+          activeContext.isCustomUpload = true;
+          wcsTargetLabel.textContent = `${activeContext.label} · WCS J2000`;
+          afterCustomFrameLoaded(labelName, fileName);
+        }
+
+        function handleImageUpload(file, epochIndex, metaEl, tagEl, labelName) {
+          if (!file) return;
+          const lower = file.name.toLowerCase();
+          const isFits = lower.endsWith('.fits') || lower.endsWith('.fit') || lower.endsWith('.fts');
+
+          if (isFits) {
+            const reader = new FileReader();
+            reader.onload = function (ev) {
+              try {
+                const fits = parseFitsBuffer(ev.target.result);
+                const offscreen = document.createElement('canvas');
+                offscreen.width = fits.width;
+                offscreen.height = fits.height;
+                const offCtx = offscreen.getContext('2d');
+                offCtx.putImageData(new ImageData(fits.rgba, fits.width, fits.height), 0, 0);
+                applyCustomEpochSource(epochIndex, offscreen, fits.width, fits.height, metaEl, tagEl, labelName, file.name, fits);
+              } catch (err) {
+                pipelineStatusText.textContent = `FITS parse error in ${file.name}: ${err.message}`;
+              }
+            };
+            reader.readAsArrayBuffer(file);
+            return;
+          }
+
+          const reader = new FileReader();
+          reader.onload = function (ev) {
+            const img = new Image();
+            img.onload = function () {
+              const offscreen = document.createElement('canvas');
+              offscreen.width = img.naturalWidth;
+              offscreen.height = img.naturalHeight;
+              const offCtx = offscreen.getContext('2d');
+              offCtx.drawImage(img, 0, 0);
+              applyCustomEpochSource(epochIndex, offscreen, img.naturalWidth, img.naturalHeight, metaEl, tagEl, labelName, file.name, null);
+            };
+            img.onerror = function () {
+              pipelineStatusText.textContent = `Could not decode ${file.name}. Use PNG, JPEG, WebP, or 2D FITS.`;
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+
+        function afterCustomFrameLoaded(labelName, fileName) {
+          alignedEpoch1Ctx.clearRect(0, 0, frameWidth, frameHeight);
+          alignedEpoch1Ctx.drawImage(epoch1Canvas, 0, 0);
+
+          hasSubtracted = false;
+          cleanSubtractedImageData = null;
+          posSignalMap = null;
+          negSignalMap = null;
+          allDetections = [];
+          selectedDetectionIdx = 0;
+          lastAlignment = { dx: 0, dy: 0, dThetaRad: 0, dThetaDeg: 0, matchedStars: 0, rmsPx: 0, applied: false };
+          tileResults = createInitialTileStates();
+
+          renderTileMatrixStrip();
+          renderTileTable();
+          renderUnifiedCatalogTable();
+          resetFocusedSourceReadout();
+          clearPsfInspector();
+
+          regStatusText.textContent = 'Ready for Star-Matching';
+          skySigmaText.textContent = 'MAD σ = -- DN';
+          subtractMeta.textContent = 'Ready';
+          pipelineStatusText.textContent = `Loaded ${labelName} (${fileName}, native ${frameWidth}×${frameHeight} px at ${activeContext.plateScaleArcsec}"/px). Click "Align & Subtract" then "Run 10-Zone Scan".`;
+          redrawSubtractCanvas(0);
+          if (blinkTimerId !== null) drawBlinkFrame();
+        }
+
+        function setupCanvasDropZone(cardEl, epochIndex, metaEl, tagEl, labelName) {
+          cardEl.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            cardEl.classList.add('drag-over');
+          });
+          cardEl.addEventListener('dragleave', function () {
+            cardEl.classList.remove('drag-over');
+          });
+          cardEl.addEventListener('drop', function (e) {
+            e.preventDefault();
+            cardEl.classList.remove('drag-over');
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+              handleImageUpload(e.dataTransfer.files[0], epochIndex, metaEl, tagEl, labelName);
+            }
+          });
+        }
+
+        function drawBlinkFrame() {
+          const useAligned = lastAlignment.applied ? alignedEpoch1Canvas : epoch1Canvas;
+          const sourceCanvas = blinkShowingEpoch1 ? useAligned : epoch2Canvas;
+          blinkCtx.clearRect(0, 0, frameWidth, frameHeight);
+          blinkCtx.drawImage(sourceCanvas, 0, 0, frameWidth, frameHeight);
+
+          blinkCtx.save();
+          blinkCtx.fillStyle = 'rgba(7, 8, 10, 0.90)';
+          blinkCtx.strokeStyle = blinkShowingEpoch1 ? '#2dd4bf' : '#fb923c';
+          blinkCtx.lineWidth = 1.5;
+          blinkCtx.fillRect(16, 16, 265, 34);
+          blinkCtx.strokeRect(16, 16, 265, 34);
+          blinkCtx.fillStyle = blinkShowingEpoch1 ? '#2dd4bf' : '#fb923c';
+          blinkCtx.font = '700 13px ui-monospace, monospace';
+          blinkCtx.fillText(
+            blinkShowingEpoch1
+              ? lastAlignment.applied
+                ? 'EPOCH 1 · STAR-ALIGNED'
+                : 'EPOCH 1 · BASELINE'
+              : 'EPOCH 2 · OBSERVATION',
+            28,
+            38
+          );
+          blinkCtx.restore();
+
+          blinkEpochLabel.textContent = blinkShowingEpoch1
+            ? lastAlignment.applied
+              ? 'FRAME: EPOCH 1 (STAR-ALIGNED BASELINE)'
+              : 'FRAME: EPOCH 1 (BASELINE)'
+            : 'FRAME: EPOCH 2 (TARGET OBSERVATION)';
+        }
+
+        function startBlinkComparator() {
+          stopBlinkComparator();
+          blinkPanel.classList.add('is-open');
+          blinkToggleBtn.textContent = 'Stop Blink';
+          blinkToggleBtn.setAttribute('aria-pressed', 'true');
+          blinkToggleBtn.classList.add('btn-active-amber');
+          blinkShowingEpoch1 = true;
+          drawBlinkFrame();
+
+          const intervalMs = Number(blinkSpeedSelect.value) || 420;
+          blinkTimerId = window.setInterval(function () {
+            blinkShowingEpoch1 = !blinkShowingEpoch1;
+            drawBlinkFrame();
+          }, intervalMs);
+        }
+
+        function stopBlinkComparator() {
+          if (blinkTimerId !== null) {
+            clearInterval(blinkTimerId);
+            blinkTimerId = null;
+          }
+          blinkPanel.classList.remove('is-open');
+          blinkToggleBtn.textContent = 'Blink Comparator';
+          blinkToggleBtn.setAttribute('aria-pressed', 'false');
+          blinkToggleBtn.classList.remove('btn-active-amber');
+        }
+
+        function copyCatalogCoordinates() {
+          if (allDetections.length === 0) {
+            pipelineStatusText.textContent = 'Run Align & Subtract and 10-Zone Scan first.';
+            return;
+          }
+
+          const lines = [
+            `SPHEREx Astrometric Difference Pipeline — ${activeContext.label}`,
+            `Registration: ${lastAlignment.applied ? `${lastAlignment.matchedStars} stars, dX=${lastAlignment.dx.toFixed(2)}, dY=${lastAlignment.dy.toFixed(2)} px, dTheta=${lastAlignment.dThetaDeg.toFixed(3)} deg, RMS=${lastAlignment.rmsPx.toFixed(2)} px` : 'Identity/None'}`,
+            `Sky Noise (MAD sigma): ${lastSkySigma.toFixed(2)} DN | Threshold: ${lastSigmaMultiplier.toFixed(1)} sigma (${lastThresholdDn.toFixed(1)} DN)`,
+            '',
+          ];
+
+          for (const det of allDetections) {
+            const wcs = pixelToWcsRaDec(
+              det.cx,
+              det.cy,
+              activeContext.centerRaDeg,
+              activeContext.centerDecDeg,
+              activeContext.plateScaleArcsec
+            );
+            const motionTxt =
+              det.motionPx !== null
+                ? `${det.motionPx.toFixed(1)} px (${(det.motionPx * activeContext.plateScaleArcsec).toFixed(1)}") @ PA ${Math.round(det.motionPaDeg)} deg`
+                : 'Single-Epoch';
+            lines.push(
+              `SRC #${det.id} | ${det.classification} | RA ${wcs.raFormatted} | Dec ${wcs.decFormatted} | (${det.cx.toFixed(1)}, ${det.cy.toFixed(1)}) px | Motion: ${motionTxt} | ${det.snr.toFixed(1)} sigma | ${det.overlapPairLabel}`
+            );
+          }
+
+          const summary = lines.join('\n');
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(summary).then(showCopyConfirmation, function () {
+              fallbackCopy(summary);
+            });
+          } else {
+            fallbackCopy(summary);
+          }
+        }
+
+        function fallbackCopy(text) {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            document.execCommand('copy');
+            showCopyConfirmation();
+          } finally {
+            document.body.removeChild(ta);
+          }
+        }
+
+        function showCopyConfirmation() {
+          const prevCopy = copyCoordsBtn.textContent;
+          copyCoordsBtn.textContent = 'Copied';
+          setTimeout(function () {
+            copyCoordsBtn.textContent = prevCopy;
+          }, 1800);
+        }
+
+        function exportCsvReport() {
+          if (allDetections.length === 0) {
+            pipelineStatusText.textContent = 'Run Align & Subtract and 10-Zone Scan before exporting CSV.';
+            return;
+          }
+          const rows = [
+            ['SPHEREx Astrometric Difference Pipeline Research Report'],
+            ['Observation Label', activeContext.label],
+            ['Image Resolution (px)', `${frameWidth} x ${frameHeight}`],
+            ['WCS Field Center RA (J2000)', formatRa(activeContext.centerRaDeg)],
+            ['WCS Field Center Dec (J2000)', formatDec(activeContext.centerDecDeg)],
+            ['Plate Scale (arcsec/px)', activeContext.plateScaleArcsec],
+            ['Matched Reference Stars', lastAlignment.matchedStars],
+            ['Alignment Shift dX (px)', lastAlignment.dx.toFixed(3)],
+            ['Alignment Shift dY (px)', lastAlignment.dy.toFixed(3)],
+            ['Alignment Rotation dTheta (deg)', lastAlignment.dThetaDeg.toFixed(4)],
+            ['Alignment RMS Residual (px)', lastAlignment.rmsPx.toFixed(3)],
+            ['MAD Sky Noise sigma (DN)', lastSkySigma.toFixed(2)],
+            ['SNR Detection Threshold (sigma)', lastSigmaMultiplier.toFixed(1)],
+            ['Effective Threshold (DN)', lastThresholdDn.toFixed(2)],
+            [],
+            [
+              'Source ID',
+              'Classification',
+              'Right Ascension (J2000)',
+              'Declination (J2000)',
+              'Epoch 2 Pixel X',
+              'Epoch 2 Pixel Y',
+              'Proper Motion (px)',
+              'Proper Motion (arcsec)',
+              'Position Angle (deg)',
+              'Detecting Tiles',
+              `${activeOverlapPx}px Overlap Confirmed`,
+              'SNR (sigma)',
+              'Aperture Flux (DN)',
+              'FWHM (px)',
+              'Confidence (%)',
+            ],
+          ];
+
+          for (const det of allDetections) {
+            const wcs = pixelToWcsRaDec(
+              det.cx,
+              det.cy,
+              activeContext.centerRaDeg,
+              activeContext.centerDecDeg,
+              activeContext.plateScaleArcsec
+            );
+            rows.push([
+              `Source #${det.id}`,
+              det.classification,
+              wcs.raFormatted,
+              wcs.decFormatted,
+              det.cx.toFixed(2),
+              det.cy.toFixed(2),
+              det.motionPx !== null ? det.motionPx.toFixed(2) : '',
+              det.motionPx !== null ? (det.motionPx * activeContext.plateScaleArcsec).toFixed(2) : '',
+              det.motionPaDeg !== null ? det.motionPaDeg.toFixed(1) : '',
+              det.zoneIds.map((id) => 'Tile #' + id).join(' & '),
+              det.isOverlapConfirmed ? 'YES' : 'NO',
+              det.snr.toFixed(2),
+              Math.round(det.flux),
+              det.fwhmPx.toFixed(2),
+              det.confidence.toFixed(1),
+            ]);
+          }
+
+          rows.push([]);
+          rows.push([
+            'Detector Tile',
+            'X0',
+            'X1',
+            'Y0',
+            'Y1',
+            'Pixels Scanned',
+            `${activeOverlapPx}px Overlap Check`,
+            'Confidence (%)',
+            'Status',
+          ]);
+
+          for (const item of tileResults) {
+            rows.push([
+              `Tile #${item.zone.id}`,
+              item.zone.x0,
+              item.zone.x1,
+              item.zone.y0,
+              item.zone.y1,
+              item.scannedPixels,
+              item.overlapStatus,
+              item.confidence === null ? '0.0' : item.confidence.toFixed(1),
+              item.status,
+            ]);
+          }
+
+          const csvContent = rows
+            .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+          const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `spherex-astrometry-${activeContext.label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.csv`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          pipelineStatusText.textContent = `Exported CSV astrometric report for ${activeContext.label}.`;
+        }
+
+        function attachCursorProbe(canvas, isSubtract) {
+          canvas.addEventListener('mousemove', function (e) {
+            const rect = canvas.getBoundingClientRect();
+            const px = Math.round(((e.clientX - rect.left) / rect.width) * frameWidth);
+            const py = Math.round(((e.clientY - rect.top) / rect.height) * frameHeight);
+            const wcs = pixelToWcsRaDec(
+              px,
+              py,
+              activeContext.centerRaDeg,
+              activeContext.centerDecDeg,
+              activeContext.plateScaleArcsec
+            );
+            cursorProbeText.textContent = `X ${px}, Y ${py} px · RA ${wcs.raFormatted}, Dec ${wcs.decFormatted}`;
+          });
+
+          if (isSubtract) {
+            canvas.addEventListener('click', function (e) {
+              if (allDetections.length <= 1) return;
+              const rect = canvas.getBoundingClientRect();
+              const px = ((e.clientX - rect.left) / rect.width) * frameWidth;
+              const py = ((e.clientY - rect.top) / rect.height) * frameHeight;
+              let nearestIdx = -1;
+              let nearestDist = 36;
+              allDetections.forEach((det, idx) => {
+                const d = Math.hypot(det.cx - px, det.cy - py);
+                if (d < nearestDist) {
+                  nearestDist = d;
+                  nearestIdx = idx;
+                }
+              });
+              if (nearestIdx >= 0) {
+                selectedDetectionIdx = nearestIdx;
+                renderUnifiedCatalogTable();
+                updateFocusedSourceReadout();
+                redrawSubtractCanvas(0);
+              }
+            });
+          }
+        }
+
+        function setViewportMode(focusDiff) {
+          if (focusDiff) {
+            canvasGrid.classList.add('is-focus-diff');
+            viewSplitBtn.classList.remove('is-active');
+            viewSplitBtn.setAttribute('aria-pressed', 'false');
+            viewFocusDiffBtn.classList.add('is-active');
+            viewFocusDiffBtn.setAttribute('aria-pressed', 'true');
+          } else {
+            canvasGrid.classList.remove('is-focus-diff');
+            viewSplitBtn.classList.add('is-active');
+            viewSplitBtn.setAttribute('aria-pressed', 'true');
+            viewFocusDiffBtn.classList.remove('is-active');
+            viewFocusDiffBtn.setAttribute('aria-pressed', 'false');
+          }
+        }
+
+        // Event bindings
+        viewSplitBtn.addEventListener('click', function () {
+          setViewportMode(false);
+        });
+        viewFocusDiffBtn.addEventListener('click', function () {
+          setViewportMode(true);
+        });
+
+        loadPresetBtn.addEventListener('click', function () {
+          loadNasaPreset(presetSelect.value);
+        });
+        presetSelect.addEventListener('change', function () {
+          loadNasaPreset(presetSelect.value);
+        });
+
+        uploadEpoch1Input.addEventListener('change', function (e) {
+          handleImageUpload(e.target.files[0], 1, epoch1Meta, epoch1Tag, 'Epoch 1 Image');
+          e.target.value = '';
+        });
+        uploadEpoch2Input.addEventListener('change', function (e) {
+          handleImageUpload(e.target.files[0], 2, epoch2Meta, epoch2Tag, 'Epoch 2 Image');
+          e.target.value = '';
+        });
+
+        toggleAdvancedWcsBtn.addEventListener('click', function () {
+          const isOpen = wcsCalibrationDrawer.classList.toggle('is-open');
+          toggleAdvancedWcsBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+          const symbol = toggleAdvancedWcsBtn.querySelector('span:last-child');
+          if (symbol) symbol.textContent = isOpen ? '−' : '+';
+        });
+
+        setupCanvasDropZone(epoch1Card, 1, epoch1Meta, epoch1Tag, 'Epoch 1 Image');
+        setupCanvasDropZone(epoch2Card, 2, epoch2Meta, epoch2Tag, 'Epoch 2 Image');
+
+        wcsRaInput.addEventListener('change', applyManualWcsCalibration);
+        wcsDecInput.addEventListener('change', applyManualWcsCalibration);
+        wcsScaleInput.addEventListener('change', applyManualWcsCalibration);
+
+        subtractionModeSelect.addEventListener('change', function () {
+          if (hasSubtracted) runPixelSubtraction();
+        });
+        matchBgToggle.addEventListener('change', function () {
+          if (hasSubtracted) runPixelSubtraction();
+        });
+        autoAlignToggle.addEventListener('change', function () {
+          if (hasSubtracted) runPixelSubtraction();
+        });
+
+        runSubtractionBtn.addEventListener('click', runPixelSubtraction);
+        runScanBtn.addEventListener('click', runTenTileExtraction);
+
+        noiseSlider.addEventListener('input', function () {
+          noiseValueLabel.textContent = `${Number(noiseSlider.value).toFixed(1)}σ`;
+          if (hasSubtracted) runPixelSubtraction();
+        });
+
+        overlapGridToggle.addEventListener('change', function () {
+          subtractTag.textContent = overlapGridToggle.checked
+            ? '10-Zone Grid'
+            : 'Grid Off';
+          redrawSubtractCanvas(0);
+        });
+
+        blinkToggleBtn.addEventListener('click', function () {
+          if (blinkTimerId !== null) stopBlinkComparator();
+          else startBlinkComparator();
+        });
+        stopBlinkBtn.addEventListener('click', stopBlinkComparator);
+        blinkSpeedSelect.addEventListener('change', function () {
+          if (blinkTimerId !== null) startBlinkComparator();
+        });
+
+        copyCoordsBtn.addEventListener('click', copyCatalogCoordinates);
+        exportCsvBtn.addEventListener('click', exportCsvReport);
+
+        attachCursorProbe(epoch1Canvas, false);
+        attachCursorProbe(epoch2Canvas, false);
+        attachCursorProbe(subtractCanvas, true);
+
+        loadNasaPreset('barnard');
+      })();
+    </script>
+  </body>
+</html>
